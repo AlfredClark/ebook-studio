@@ -1,0 +1,89 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "./themes/index.css";
+@import "shadcn-svelte/tailwind.css";
+@import "@fontsource-variable/inter";
+
+/* 深色模式 class 策略：dark: 工具类跟随 document.documentElement 的 .dark 类
+   （而非 prefers-color-scheme 媒体查询），与 mode-watcher 的 class 切换一致 */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Tailwind 变量映射：--color-* / --radius-* 桥接 themes/*.css 的语义 token。
+ * 单一真相源集中在入口文件，主题文件只承载变量值（换主题只改 themes/）。 */
+@theme inline {
+  /* 字体栈：默认 Inter Variable（已 import），运行时经 --app-font-sans 覆盖（settings.font 偏好） */
+  --font-sans: var(
+    --app-font-sans,
+    "Inter Variable",
+    ui-sans-serif,
+    system-ui,
+    sans-serif,
+    "Apple Color Emoji",
+    "Segoe UI Emoji",
+    "Segoe UI Symbol",
+    "Noto Color Emoji"
+  );
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /* html font-size 为 rem 基准：--app-font-size 缩放全局界面（settings.fontSize 偏好，兜底 16px 不变）；
+     font-weight 为全局默认字重（settings.fontWeight 偏好，兜底 400 不变） */
+  html {
+    @apply font-sans;
+
+    --app-font-size: inherit;
+    --app-font-weight: inherit;
+
+    font-size: var(--app-font-size, 16px);
+    font-weight: var(--app-font-weight, 400);
+  }
+}
+
+/* 相对字重工具类：比全局字重（--app-font-weight，settings.fontWeight 偏好）粗一档（+200），
+   物理上限 900（font-weight 合法域 1-1000）；未设偏好时 var 兜底 400 → 600，与 font-semibold 一致 */
+@utility font-bolder {
+  font-weight: min(calc(var(--app-font-weight, 400) + 200), 900);
+}

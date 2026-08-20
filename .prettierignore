@@ -1,0 +1,10 @@
+node_modules
+.svelte-kit
+build
+package
+src-tauri
+target
+Cargo.lock
+bun.lock
+src/libs/i18n/paraglide
+src/libs/i18n/project.inlang

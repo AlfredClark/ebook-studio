@@ -1,0 +1,22 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "plugins",
+  "description": "Plugin permissions for the main window",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "dialog:default",
+    "fs:default",
+    "global-shortcut:default",
+    "log:default",
+    "notification:default",
+    "opener:default",
+    "os:default",
+    "process:default",
+    "sql:default",
+    "sql:allow-execute",
+    "system-fonts:default",
+    "updater:default"
+  ]
+}

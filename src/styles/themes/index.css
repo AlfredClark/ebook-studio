@@ -1,0 +1,10 @@
+/* 主题 CSS 聚合入口：app.css 仅经此文件一次性引入全部主题。
+ * 新增主题在此追加 import（顺序即 :root 基底优先、覆盖层在后的语义顺序）。 */
+
+@import "./neutral.css";
+@import "./stone.css";
+@import "./zinc.css";
+@import "./mauve.css";
+@import "./olive.css";
+@import "./mist.css";
+@import "./taupe.css";

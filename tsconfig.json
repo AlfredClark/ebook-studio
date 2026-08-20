@@ -1,0 +1,16 @@
+{
+  // 继承 svelte-kit sync 生成的配置（路径别名、DOM 类型等）
+  "extends": "./.svelte-kit/tsconfig.json",
+  "compilerOptions": {
+    "allowJs": true, // 允许 JS 文件参与编译
+    "allowImportingTsExtensions": true, // 允许带 .ts 扩展名导入（依赖 noEmit）
+    "checkJs": true, // 对 JS 文件也进行类型检查
+    "esModuleInterop": true, // CJS 与 ESM 互操作兼容
+    "forceConsistentCasingInFileNames": true, // 强制导入文件名大小写一致
+    "resolveJsonModule": true, // 允许直接导入 JSON 文件
+    "skipLibCheck": true, // 跳过 .d.ts 声明文件检查（加速构建）
+    "sourceMap": true, // 生成 source map 便于调试
+    "strict": true, // 开启全部严格类型检查
+    "moduleResolution": "bundler" // 现代 bundler 解析策略（兼容 vite）
+  }
+}

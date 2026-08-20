@@ -1,0 +1,31 @@
+# workspace 根：成员 src-tauri 为桌面端（Rust）
+[workspace]
+members = ["src-tauri"]
+resolver = "2"
+
+# 统一的 rustc 警告级别
+[workspace.lints.rust]
+warnings = "warn"
+
+# 统一的 clippy 检查级别（lint:all 以 -D warnings 执行）
+[workspace.lints.clippy]
+all = "warn"
+
+# dev 构建：主代码保留完整调试信息，IDE 调试器可查看变量
+[profile.dev]
+debug = "full"
+
+# 依赖（tauri 等）编译产物可缓存，用 opt-level 1 提升 dev 运行速度；
+# line-tables-only 保证 panic backtrace 有行号，同时控制编译时间与体积
+[profile.dev.package."*"]
+opt-level = 1
+debug = "line-tables-only"
+
+# release 构建：体积优先（Tauri 官方推荐组合）
+[profile.release]
+opt-level = "s"        # 优化二进制体积
+debug = false
+codegen-units = 1      # 单 codegen unit 配合 LTO 最大化优化
+lto = "fat"            # 全程序链接时优化（链接时间较长）
+panic = "abort"        # release 下 panic 直接终止，减小体积
+strip = "symbols"      # 剥离符号表

@@ -1,0 +1,3 @@
+# 固定 stable 渠道（随上游滚动，不做具体版本锁定；升级新 stable 后注意 clippy 新 lint 可能使 CI 变红）
+[toolchain]
+channel = "stable"

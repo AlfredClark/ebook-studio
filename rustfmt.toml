@@ -1,0 +1,3 @@
+# 与 package.json 中 prettier 的 printWidth 128 对齐，保证前后端格式规范一致
+edition = "2024"
+max_width = 128
