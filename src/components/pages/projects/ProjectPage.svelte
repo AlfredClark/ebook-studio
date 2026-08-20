@@ -5,7 +5,7 @@
   import { resolve } from "$app/paths";
   import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
   import ChevronUpIcon from "@lucide/svelte/icons/chevron-up";
-  import EyeIcon from "@lucide/svelte/icons/eye";
+  import FolderOpenIcon from "@lucide/svelte/icons/folder-open";
   import PencilIcon from "@lucide/svelte/icons/pencil";
   import PlusIcon from "@lucide/svelte/icons/plus";
   import { Badge } from "$components/ui/badge";
@@ -157,8 +157,10 @@
     void goto(resolve(`/projects/edit/${uuid}`));
   }
 
-  function handleOpen() {
-    // 占位：打开功能暂不实现
+  function handleOpen(identifier: string) {
+    const raw = identifier;
+    const uuid = raw.startsWith("urn:uuid:") ? raw.slice("urn:uuid:".length) : raw;
+    void goto(resolve(`/workspace/${uuid}`));
   }
 
   async function handleDelete() {
@@ -284,6 +286,7 @@
                   <button
                     type="button"
                     onclick={() => handleSelect(project.identifier)}
+                    ondblclick={() => handleOpen(project.identifier)}
                     class="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden text-left text-sm"
                   >
                     <span class="shrink-0 truncate font-medium">{project.title}</span>
@@ -302,9 +305,9 @@
                     variant="ghost"
                     size="icon"
                     class="size-7 shrink-0"
-                    onclick={handleOpen}
+                    onclick={() => handleOpen(project.identifier)}
                   >
-                    <EyeIcon class="size-4" />
+                    <FolderOpenIcon class="size-4" />
                   </TooltipButton>
                 </div>
               {/each}
@@ -329,10 +332,10 @@
               <!-- 封面 -->
               <div class="flex justify-center">
                 {#if coverSrc}
-                  <img src={coverSrc} alt="cover" class="aspect-[3/4] w-48 rounded-lg border object-cover shadow-sm" />
+                  <img src={coverSrc} alt="cover" class="aspect-3/4 w-48 rounded-lg border object-cover shadow-sm" />
                 {:else}
                   <div
-                    class="flex aspect-[3/4] w-48 items-center justify-center rounded-lg border bg-muted text-xs text-muted-foreground"
+                    class="flex aspect-3/4 w-48 items-center justify-center rounded-lg border bg-muted text-xs text-muted-foreground"
                   >
                     {m.projects_detail_no_cover()}
                   </div>
@@ -416,7 +419,7 @@
                         <span class="text-muted-foreground">{m.projects_detail_description()}</span>
                         <div class="space-y-1">
                           {#each selected.description as line (line)}
-                            <p class="text-sm break-words">{line}</p>
+                            <p class="text-right text-sm wrap-break-word">{line}</p>
                           {/each}
                         </div>
                       </div>

@@ -207,5 +207,17 @@
   "projects_detail_no_cover": "No cover",
   "projects_detail_no_content": "No content",
   "projects_load_failed": "Failed to load projects",
+  "workspace_back": "Back",
+  "workspace_stage_inspect": "Inspect",
+  "workspace_stage_split": "Split",
+  "workspace_stage_clean": "Clean",
+  "workspace_stage_build": "Build",
+  "workspace_stage_package": "Package",
+  "workspace_stage_inspect_desc": "Inspect stage — TODO",
+  "workspace_stage_split_desc": "Split stage — TODO",
+  "workspace_stage_clean_desc": "Clean stage — TODO",
+  "workspace_stage_build_desc": "Build stage — TODO",
+  "workspace_stage_package_desc": "Package stage — TODO",
+  "workspace_load_failed": "Failed to load project",
   "footer_copyright": "Copyright © {year} {author}"
 }

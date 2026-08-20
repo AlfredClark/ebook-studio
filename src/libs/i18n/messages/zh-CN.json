@@ -207,5 +207,17 @@
   "projects_detail_no_cover": "无封面",
   "projects_detail_no_content": "无正文",
   "projects_load_failed": "加载项目失败",
+  "workspace_back": "返回",
+  "workspace_stage_inspect": "检查",
+  "workspace_stage_split": "拆分",
+  "workspace_stage_clean": "清理",
+  "workspace_stage_build": "构建",
+  "workspace_stage_package": "打包",
+  "workspace_stage_inspect_desc": "检查阶段 — 待实现",
+  "workspace_stage_split_desc": "拆分阶段 — 待实现",
+  "workspace_stage_clean_desc": "清理阶段 — 待实现",
+  "workspace_stage_build_desc": "构建阶段 — 待实现",
+  "workspace_stage_package_desc": "打包阶段 — 待实现",
+  "workspace_load_failed": "加载项目失败",
   "footer_copyright": "© {year} {author} 版权所有"
 }
