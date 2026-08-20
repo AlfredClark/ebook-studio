@@ -5,10 +5,5 @@ tray:
 menu:
   navigate: "导航"
   home: "首页"
-  clean: "清洗"
   settings: "设置"
   about: "关于"
-clean:
-  not_txt: "未找到 txt 文件"
-  copy_failed: "复制文件失败"
-  delete_failed: "删除文件失败"

@@ -1,10 +1,10 @@
-//! 应用菜单栏核心逻辑（macOS 专属）：系统菜单栏 + 导航四页 + Edit/Quit 预设。
+//! 应用菜单栏核心逻辑（macOS 专属）：系统菜单栏 + 导航三页 + Edit/Quit 预设。
 //!
 //! 平台策略：本应用窗口为 `decorations: false` 自绘标题栏，Windows/Linux 上窗口菜单
 //! 会与自绘标题栏冲突（且托盘 + 全局快捷键已覆盖常用操作），故菜单仅在 macOS 编译
 //! 启用（`#[cfg(target_os = "macos")]`）——macOS 菜单渲染在系统全局菜单栏，与窗口无关。
 //! 设计要点：
-//! - 导航组（首页/清洗/设置/关于）：文案经 rust-i18n 本地化，点击 emit `menu:navigate`
+//! - 导航组（首页/设置/关于）：文案经 rust-i18n 本地化，点击 emit `menu:navigate`
 //!   事件（payload 为目标页标识），前端统一监听切换路由；Cmd+1/2/3 加速器。
 //! - Edit 组（Undo/Redo/Cut/Copy/Paste/Select All）：tauri 预设项，补齐 WKWebView
 //!   编辑命令（无 Edit 菜单时 Cmd+C/V 在输入框可能失效）。
@@ -20,8 +20,6 @@ use crate::cores::events::{MenuPage, emit_menu_navigate};
 
 /// 导航菜单项 id
 const MENU_HOME: &str = "menu-home";
-/// 导航菜单项 id
-const MENU_CLEAN: &str = "menu-clean";
 /// 导航菜单项 id
 const MENU_SETTINGS: &str = "menu-settings";
 /// 导航菜单项 id
@@ -47,13 +45,11 @@ fn build_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<tau
         .build()?;
 
     let home = MenuItem::with_id(app, MENU_HOME, t!("menu.home"), true, Some("Cmd+1"))?;
-    let clean = MenuItem::with_id(app, MENU_CLEAN, t!("menu.clean"), true, Some("Cmd+2"))?;
-    let settings = MenuItem::with_id(app, MENU_SETTINGS, t!("menu.settings"), true, Some("Cmd+3"))?;
-    let about = MenuItem::with_id(app, MENU_ABOUT, t!("menu.about"), true, Some("Cmd+4"))?;
+    let settings = MenuItem::with_id(app, MENU_SETTINGS, t!("menu.settings"), true, Some("Cmd+2"))?;
+    let about = MenuItem::with_id(app, MENU_ABOUT, t!("menu.about"), true, Some("Cmd+3"))?;
 
     let navigate_menu = SubmenuBuilder::new(app, t!("menu.navigate"))
         .item(&home)
-        .item(&clean)
         .item(&settings)
         .item(&about)
         .build()?;
@@ -73,7 +69,6 @@ fn register_events<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     app.on_menu_event(|app, event| {
         let page = match event.id().as_ref() {
             MENU_HOME => Some(MenuPage::Home),
-            MENU_CLEAN => Some(MenuPage::Clean),
             MENU_SETTINGS => Some(MenuPage::Settings),
             MENU_ABOUT => Some(MenuPage::About),
             _ => None,

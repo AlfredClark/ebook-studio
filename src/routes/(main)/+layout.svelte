@@ -12,7 +12,7 @@
   let disposed = false;
   onMount(() => {
     void listenEvent<MenuPage>(EVENT_MENU_NAVIGATE, (payload) => {
-      const pages = { home: "/", clean: "/clean", settings: "/settings", about: "/about" } as const;
+      const pages = { home: "/", settings: "/settings", about: "/about" } as const;
       // 经 $app/paths 的 resolve 包一层：满足内部导航校验（eslint 规则要求）且自动加 base 前缀
       void goto(resolve(pages[payload] ?? "/"));
     })

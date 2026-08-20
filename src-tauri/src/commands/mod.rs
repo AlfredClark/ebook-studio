@@ -1,4 +1,3 @@
-pub mod clean;
 pub mod config;
 pub mod env;
 
@@ -7,10 +6,6 @@ pub mod env;
 macro_rules! invoke_handlers {
     () => {
         tauri::generate_handler![
-            $crate::commands::clean::list_txts,
-            $crate::commands::clean::copy_txt,
-            $crate::commands::clean::get_txt_detail,
-            $crate::commands::clean::delete_txt,
             $crate::commands::config::get_config,
             $crate::commands::config::set_locale,
             $crate::commands::config::resolve_locale,

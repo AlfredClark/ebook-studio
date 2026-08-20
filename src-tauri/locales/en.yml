@@ -5,10 +5,5 @@ tray:
 menu:
   navigate: "Navigate"
   home: "Home"
-  clean: "Clean"
   settings: "Settings"
   about: "About"
-clean:
-  not_txt: "No txt files found"
-  copy_failed: "Failed to copy file"
-  delete_failed: "Failed to delete file"
