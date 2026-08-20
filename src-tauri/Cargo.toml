@@ -23,6 +23,8 @@ workspace = true
 [dependencies]
 base64 = "0.22"
 chrono = "0.4"
+regex = "1"
+encoding_rs = "0.8"
 log = "0.4.33"
 rust-i18n = "4.2.1"
 serde = { version = "1.0.229", features = ["derive"] }
@@ -45,3 +47,4 @@ tauri-plugin-store = "2.4.4"
 tauri-plugin-system-fonts = "2.0.2"
 tauri-plugin-updater = "2.10.1"
 tauri-plugin-window-state = "2"
+chinese-number = "0.8.2"

@@ -1,5 +1,6 @@
 pub mod config;
 pub mod env;
+pub mod inspect;
 pub mod projects;
 
 /// 汇总所有需要暴露给前端的 IPC 命令：lib.rs 的 invoke_handler 只需调用一次本宏。
@@ -25,6 +26,9 @@ macro_rules! invoke_handlers {
             $crate::commands::projects::resolve_project_asset,
             $crate::commands::projects::get_file_stats,
             $crate::commands::projects::read_image_as_data_url,
+            $crate::commands::inspect::inspect_content,
+            $crate::commands::inspect::reorder_chapters,
+            $crate::commands::inspect::get_content_path,
         ]
     };
 }
