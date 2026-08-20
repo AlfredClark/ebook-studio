@@ -1,5 +1,4 @@
 pub mod config;
-pub mod demo;
 pub mod env;
 
 /// 汇总所有需要暴露给前端的 IPC 命令：lib.rs 的 invoke_handler 只需调用一次本宏。
@@ -7,7 +6,6 @@ pub mod env;
 macro_rules! invoke_handlers {
     () => {
         tauri::generate_handler![
-            $crate::commands::demo::greet,
             $crate::commands::config::get_config,
             $crate::commands::config::set_locale,
             $crate::commands::config::resolve_locale,

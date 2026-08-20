@@ -3,5 +3,5 @@
 
 fn main() {
     // 实际逻辑位于 lib.rs 的 run()，便于移动端入口复用同一实现
-    tauri_desktop_template_lib::run()
+    ebook_studio_lib::run()
 }

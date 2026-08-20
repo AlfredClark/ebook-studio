@@ -91,5 +91,5 @@ sort_commits = "newest"
 recurse_submodules = false
 
 [remote.github]
-owner = "alfredclark"
-repo = "tauri-desktop-template"
+owner = "AlfredClark"
+repo = "ebook-studio"

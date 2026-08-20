@@ -2,14 +2,20 @@
 
 ## 项目说明
 
-本项目是基于 Tauri 2 的桌面应用开发模板，前端使用 SvelteKit 5 + TypeScript，后端使用 Rust。项目已集成托盘、全局快捷键、开机自启、单实例、自动更新、对话框、文件系统、系统信息、剪贴板、多语言、日志等桌面应用常见能力，可作为新桌面应用项目的起点。
+本项目 ebook-studio 是一个为电子书管理提供便利的跨平台桌面应用，基于 Tauri 2 + SvelteKit 5 + TypeScript + Rust 构建。已集成系统托盘、全局快捷键、开机自启、单实例、自动更新、对话框、文件系统、系统信息、剪贴板、多语言、日志、窗口状态记忆等桌面应用常见能力，当前保留首页、设置、关于三个核心页面，演示模块已移除。
+
+- 项目名：ebook-studio
+- 简介：A cross platform desktop application designed to provide convenience for e-book manage
+- 仓库：https://github.com/AlfredClark/ebook-studio
+- 窗口标题：Ebook Studio（配置项 `tauri.conf.json` 的 `windows[0].title`），其余标识统一为 `ebook-studio`（`productName`/`identifier`/`package.json name`）
+- 版本：0.1.0（`package.json` / `src-tauri/Cargo.toml` / `src-tauri/tauri.conf.json` 三处同步，`scripts/bump-version.mjs` 统一提升）
 
 ## 技术栈
 
 - **前端**：SvelteKit 5 / Svelte 5 / TypeScript / Vite / Tailwind CSS v4 / shadcn-svelte，包管理器 bun
 - **后端**：Tauri 2 / Rust（edition 2024），Cargo workspace（成员为 `src-tauri`）
 - **国际化**：前端 Paraglide（inlang），后端 rust-i18n
-- **集成能力**：系统托盘、全局快捷键、开机自启、单实例、自动更新、对话框、文件系统、系统信息、剪贴板、文件拖放、应用菜单（macOS）、通知、日志、窗口状态记忆、窗口置顶（环境能力探测）、SQLite 本地数据库（tauri-plugin-sql）
+- **集成能力**：系统托盘、全局快捷键、开机自启、单实例、自动更新、对话框、文件系统、系统信息、剪贴板、文件拖放、应用菜单（macOS）、通知、日志、窗口状态记忆、窗口置顶（环境能力探测）、SQLite 本地数据库（tauri-plugin-sql，能力保留，业务表待扩展）
 - **质量工具**：ESLint / Stylelint / Prettier / Clippy / rustfmt / Vitest 单测 / Husky + lint-staged
 - **授权**：GPL-3.0-only
 
@@ -25,14 +31,12 @@
 │   │   │   └── parts/              # 布局骨架部件（TabsNavBar 导航条 + WindowControl 窗口控制 + nav-items 导航数据）
 │   │   ├── pages/                  # 页面级组件（与 routes/(main)/ 页面一一对应）
 │   │   │   ├── about/              # 关于页组件（AppAbout / SystemAbout）
-│   │   │   ├── demo/               # 演示页组件（DemoPage，模板初始化可整体移除）
 │   │   │   └── settings/           # 设置页组件（Appearance / SystemSettings）
 │   │   ├── ui/                     # shadcn-svelte 生成组件（仅经 CLI 添加，components.json 管理）
 │   │   └── widgets/                # 通用小组件（自包含、可插拔，按功能分子目录）
 │   │       ├── icons/              # 品牌/自定义图标（GithubIcon）
 │   │       └── overlay/            # 浮层组件（ConfirmDialog 确认对话框 + TooltipButton 提示按钮，复合组件式）
 │   ├── features/                   # 业务功能模块（与后端 src-tauri/src/features 命名镜像——前端每功能一个目录，后端为扁平 .rs 模块，结构不镜像）
-│   │   └── demo/                   # 演示业务（greet 示例）
 │   ├── libs/                       # 前端模块库
 │   │   ├── drag-drop/              # 文件拖放（封装核心 API onDragDropEvent，窗口级监听，免权限）
 │   │   ├── errors/                 # 错误处理
@@ -43,7 +47,7 @@
 │   │   ├── logger/                 # 日志（对接 tauri-plugin-log）
 │   │   ├── overlay/                # 浮层（toast 统一出口）
 │   │   ├── process/                # 进程能力（重导出 tauri-plugin-process 的 exit/relaunch）
-│   │   ├── sql/                    # SQL 数据层（封装 tauri-plugin-sql：initSql 建表 + 类型化读写）
+│   │   ├── sql/                    # SQL 数据层（封装 tauri-plugin-sql：initSql 建表 + 类型化读写，业务表在此扩展，当前为通用空壳）
 │   │   ├── stores/                 # 全局状态（settings 偏好 + store 工厂）
 │   │   ├── system/                 # 系统配置（config 快照缓存 + toggle 业务 + 共享响应式状态）
 │   │   ├── updater/                # 自动更新（check/install + 模块级状态 state.svelte.ts）
@@ -57,7 +61,7 @@
 │   ├── capabilities/               # Tauri 权限配置（default / plugins）
 │   ├── locales/                    # rust-i18n 语言文件
 │   ├── src/
-│   │   ├── commands/               # Tauri 命令（config / demo / env）
+│   │   ├── commands/               # Tauri 命令（config / env）
 │   │   ├── cores/                  # 核心模块
 │   │   │   ├── autostart.rs        # 开机自启
 │   │   │   ├── config.rs           # 配置管理
@@ -95,7 +99,7 @@
 ├── eslint.config.ts                # ESLint 配置
 ├── LICENSE                         # GPL-3.0-only
 ├── package.json                    # 前端依赖与脚本（bun）、lint-staged
-├── README.md                       # 项目说明
+├── README.md                       # 项目说明（仅三行：标题 + 简介 + 许可）
 ├── rust-toolchain.toml             # Rust 工具链渠道固定（stable 滚动，不做版本锁定）
 ├── rustfmt.toml                    # rustfmt 配置
 ├── svelte.config.ts                # SvelteKit 配置
@@ -152,7 +156,7 @@
 - **错误分级**：可恢复错误不阻断启动（`log::warn!` 后继续，如自启/快捷键同步失败）；关键错误返回 `Err` 阻断
 - **损坏恢复**：配置损坏备份为 `*.corrupt` 后重建，不阻断启动
 - **插件装配**：需业务配置/事件的插件经 cores 的 `plugin()` 统一封装（如 `config::plugin()` 装配 store、`logger::plugin()` 配置日志目标、`shortcut::plugin()` 注册快捷键 handler），lib.rs 仅链式调用，不写插件细节
-- **官方插件**：无需定制的插件（opener/clipboard-manager/process/notification/system-fonts/dialog/fs/os/updater）直接在 lib.rs 以 `tauri_plugin_xxx::init()` 注册
+- **官方插件**：无需定制的插件（opener/clipboard-manager/process/notification/system-fonts/dialog/fs/os/updater/sql）直接在 lib.rs 以 `tauri_plugin_xxx::init()` 注册；`sql` 为通用能力保留，业务表由前端 `libs/sql` 幂等建表
 - **注册顺序**：单实例插件置于链首——尽早注册单例锁，避免窗口建好后回调竞态
 - **职责分离**：事件/回调逻辑放 plugin()（如快捷键 handler、单实例聚焦回调），setup() 只做初始化与状态同步，不混写
 - **权限同步**：新增插件且前端需调用其 API 时，同步在 `capabilities/plugins.json` 追加权限（如 `global-shortcut:default`）
@@ -202,7 +206,7 @@
 ### 架构与模块
 
 - **SPA 模式**：`+layout.ts` 关闭 SSR（`ssr = false`）；adapter-static + fallback 单页渲染，适配 Tauri 本地文件加载
-- **routes/**：分组路由——`(main)` 组存放主窗口页面；页面内容经 `(main)/+layout.svelte` 包裹 LayoutContainer 渲染
+- **routes/**：分组路由——`(main)` 组存放主窗口页面（首页 `/`、设置 `/settings`、关于 `/about`）；页面内容经 `(main)/+layout.svelte` 包裹 LayoutContainer 渲染
 - **components/**：业务组件目录——按性质分层：`pages/` 页面级组件（仅被 routes/(main)/ 对应页面消费，与页面一一对应）、`widgets/` 自包含可插拔小组件、`layouts/` 布局系统、`ui/` shadcn 生成组件（svelte.config.ts 已预留 `$components` 别名）
 - **components/ui/**：shadcn-svelte 生成组件（`$components/ui` 别名）——经 `bunx shadcn-svelte add <name>` 拉取，源码即项目代码，允许按需修改（尽可能不修改，本地修改后升级组件时须注意差异）；**生成区禁手动添加组件**，需定制的基础组件放 components 对应功能分类；别名配置见 components.json（ui=$components/ui、utils=$libs/utils/shadcn）
 - **libs/**：前端模块库，每模块的文件约定——`index.ts` 统一出口、`core.ts` 实现、`types.ts` 类型契约；跨组件共享的 runes 模块级状态放 `state.svelte.ts`（如 updater 的 `update` 状态，ESM 仅加载一次）
@@ -322,14 +326,14 @@
 ### 国际化
 
 - **文案**：一律经 paraglide 编译产物 `m.xxx()` 取，不硬编码；动态文案用 `ParaglideMessage` 组件
-- **键命名**：`<前缀>_<具体含义>`（全小写 snake_case），前缀按归属域——`nav_` 导航标签 / `window_control_` 窗口控制 / `settings_` 设置项 / `about_` 关于页 / `theme_` 主题 / `layout_` 布局 / `language_` 语言 / `footer_` 页脚 / `boundary_` 错误边界 / `common_` 通用文案（确认/取消按钮）/ `home_` 首页文案 / `demo_` 演示页（模板初始化时整体移除）/ `sidebar_` 侧边栏 / `updater_` 更新提示；禁止裸名词键（如 `welcome`）
+- **键命名**：`<前缀>_<具体含义>`（全小写 snake_case），前缀按归属域——`nav_` 导航标签 / `window_control_` 窗口控制 / `settings_` 设置项 / `about_` 关于页 / `theme_` 主题 / `layout_` 布局 / `language_` 语言 / `footer_` 页脚 / `boundary_` 错误边界 / `common_` 通用文案（确认/取消按钮）/ `home_` 首页文案 / `sidebar_` 侧边栏 / `updater_` 更新提示；禁止裸名词键（如 `welcome`）。已移除 `demo_` 演示前缀
 - **消息源**：`messages/{locale}.json`；新增语言需同步 `project.inlang/settings.json` 的 locales；改动后运行 `bun run i18n:compile`
 - **locale 真相源**：config.json（后端）为准，存储模式值为 `system`（跟随系统）或具体标签；`changeLocale` 先写后端成功才切前端（双写，set_locale 返回解析后的具体标签喂 paraglide）；`initLocale` 启动时同步（system 模式经 `resolve_locale` 命令解析），失同步以 config 为准 reload 自愈
 - **首帧**：app.html 硬编码 lang="en"，由 initLocale 运行期更新 `document.documentElement.lang`
 
 ### 注意事项
 
-- **成对依赖**：前端用到的 Tauri 能力需 npm 包 + Rust 侧 tauri-plugin 依赖 + `capabilities/plugins.json` 权限三者齐备（如 notification/updater/system-fonts/clipboard-manager/sql——sql 需显式追加 `sql:allow-execute`，默认权限集不含写操作）
+- **成对依赖**：前端用到的 Tauri 能力需 npm 包 + Rust 侧 tauri-plugin 依赖 + `capabilities/plugins.json` 权限三者齐备（如 notification/updater/system-fonts/clipboard-manager/sql——sql 已保留，含 `sql:default` + `sql:allow-execute`）
 - **构建配置**：vite dev 端口固定 1420（strictPort），与 tauri.conf.json 的 devUrl/CSP 一致；watch 忽略 `src-tauri` 与根 `target`（Windows 上 watch 被 cargo 锁定的构建脚本 exe 会 EBUSY 崩溃）；改端口需同步改 tauri.conf.json
 - **首帧性能**：SPA 白屏经「单入口打包」缓解——`svelte.config.ts` 配 `kit.output.bundleStrategy: "single"` 收敛 JS 单入口（消除 modulepreload/动态 import 请求链，JS 仍外链不受 CSP 约束）
 - **全局常量注入**：经 vite `define` 整体注入配置对象（`__APP_TAURI_CONF__` 为整份 tauri.conf.json、`__APP_PKG__` 为整份 package.json），消费方按需取属性；类型在 `src/vite-env.d.ts` 经 `import type ... from "*.json"` 引用 JSON 字面量推导（天然同步）；新增配置须同步 eslint.config.ts 的 `viteDefineGlobals`；watch 忽略 src-tauri，改配置需重启 dev 生效
@@ -353,23 +357,21 @@
 
 ## 文档约定（README）
 
-- **双语文档**：`README.md`（根目录）默认英文；`docs/README_zh-CN.md` 为简体中文版；标题下方语言行并列双语言，**当前语言为纯文本无链接**，另一语言为跳转链接（英文版 `English · [简体中文](docs/README_zh-CN.md)`，中文版 `[English](../README.md) · 简体中文`）
-- **内容范围**：仅包含标题、简介、截图、技术栈、插件、开发规范（指向 AGENTS.md）、快速开始、许可等精简内容，不展开架构细节（架构细节见本规范）
-- **截图**：三个页面截图位于 `docs/images/`（home.png / settings.png / about.png），双语文档分别以相对路径引用（`docs/images/*.png` / `images/*.png`），新增页面截图须同步补充
-- **维护同步**：技术栈/插件变更时同步更新两份文档对应列表；快速开始中的命令与 package.json 脚本保持一致（`bun install` 后须先 `bun run i18n:compile`——paraglide 编译产物不入库）
+- **内容**：`README.md` 与 `docs/README_zh-CN.md` 均精简为三行：标题（`# ebook-studio`）+ 简介（`A cross platform desktop application designed to provide convenience for e-book manage`）+ 许可行（`[GPL-3.0-only](LICENSE)`）；不含技术栈/截图/快速开始等扩展内容
+- **历史模板文档**：原模板的双语详细文档、技术栈与截图说明已归档于 `AGENTS.md`，README 仅保留最小标识
+- **维护同步**：后续技术栈/插件变更同步更新 `AGENTS.md`；`README.md` 保持三行不变
 
 ## 版本发布
 
-- **版本号同步**：`package.json`、`src-tauri/Cargo.toml`、`tauri.conf.json` 三处 version 保持一致；经 `scripts/bump-version.mjs` 提升——`bun run version:patch|minor|major` 按等级递增，或 `node scripts/bump-version.mjs 1.2.3` 直接指定版本，不手动改
+- **版本号同步**：`package.json`、`src-tauri/Cargo.toml`、`tauri.conf.json` 三处 version 保持一致（当前 0.1.0）；经 `scripts/bump-version.mjs` 提升——`bun run version:patch|minor|major` 按等级递增，或 `node scripts/bump-version.mjs 1.2.3` 直接指定版本，不手动改
 - **发布流程**：推送 tag（如 `v0.2.0`）触发 release.yml——tauri-action 三平台构建（linux/macos/windows）+ git-cliff 生成 CHANGELOG 写入 release notes
 - **产物证明**：构建产物经 `actions/attest@v4` 生成 SLSA 构建溯源证明（Sigstore 签名，Release 页面显示已验证徽章，`gh attestation verify` 可核验）；仅证明安装包本体，不含 `.sig`/`latest.json`；需工作流顶层 `id-token: write` + `attestations: write` 权限；subject-path glob 与 tauri.conf.json 的 bundle targets 保持一致，变更 targets 须同步更新 glob；已知边界——attest 失败时 release 已由 tauri-action 先行创建，job 标红提示
-- **签名密钥**：自动更新安装包签名需在仓库配置 `TAURI_SIGNING_PRIVATE_KEY` secret
+- **签名密钥**：自动更新安装包签名需在仓库配置 `TAURI_SIGNING_PRIVATE_KEY` secret（当前 `tauri.conf.json` 的 `plugins.updater.pubkey` 为模板占位，需 `tauri signer generate` 重新生成并填入，私钥入 secret，公钥填配置，`endpoints` 已指向 `https://github.com/AlfredClark/ebook-studio/releases/latest/download/latest.json`）
 - **应用签名（macOS/Windows）**：模板默认**未配置**，留空位由使用者按需接入——macOS 未签名/未公证的应用受 Gatekeeper 拦截且 updater 不可用（tauri-action 经 `APPLE_CERTIFICATE` / `APPLE_CERTIFICATE_PASSWORD` / `APPLE_SIGNING_IDENTITY` / `APPLE_ID` / `APPLE_PASSWORD` / `APPLE_TEAM_ID` 环境变量启用签名与公证）；Windows 未签名触发 SmartScreen 警告（`tauri.conf.json` 的 `bundle.windows` 配 `certificateThumbprint` / `digestAlgorithm` / `timestampUrl`，或 Azure Trusted Signing）；签名证书与密钥一律入仓库 secret，不落库
 
 ## 新增功能流程
 
 - **后端**：`features/` 写业务逻辑（返回 `AppResult<T>`）→ `commands/` 写命令（校验 + 调 features + 转 `Response<T>`）→ 追加 `invoke_handlers!` 宏 → 文案加 `locales/*.yml`；涉及新能力时同步 Cargo.toml 依赖与 capabilities 权限
 - **前端**：业务逻辑写 `src/features/<功能>/`（可直接调 `invokeCommand`）→ 文案经 `m.xxx()` 并加入 `messages/*.json` → 运行 `bun run i18n:compile`；新 UI 偏好经 `storeDef` + `createStoreGroup` 组装进 `settings`（stores/index.ts），偏好残留校验等初始化在模块作用域显式执行（如 settings.ts 启动校验）；跨组件共享的瞬时状态（非持久化偏好）用 `state.svelte.ts` runes 模块；UI 基础组件经 `bunx shadcn-svelte add <name>` 拉取到 `$components/ui`（不覆盖已有组件）
-- **模板初始化（重命名）**：发布自有应用前完成身份重命名——`tauri.conf.json` 的 `identifier` / `productName` / 窗口 `title`；`plugins.updater.pubkey`（`tauri signer generate` 重新生成私钥与公钥，私钥入仓库 secret `TAURI_SIGNING_PRIVATE_KEY`）与 `endpoints`（指向自有仓库）；`package.json` 的 name/author/homepage/repository；`src-tauri/Cargo.toml` 的 authors/repository；应用图标（`static/icon.png` + `bun run tauri:icon` 重新生成 `src-tauri/icons/`）。漏改 updater 配置会导致自动更新拉取到原模板仓库的更新包或签名校验失败
-- **模板初始化（移除演示）**：删除 demo 演示模块即完成项目初始化——触点清单见 `src/components/pages/demo/DemoPage.svelte` 头部注释（路由页 / pages/demo / features/demo / nav-items 导航项 / messages 的 demo_* 键 / features-demo.rs / commands-demo.rs / 两处 mod 注册 / locales 的 demo: 块 / `src/libs/sql/` SQL 能力层 / Cargo.toml 的 tauri-plugin-sql 依赖 / lib.rs 的 SQL 插件注册行 / capabilities 的 sql:default 与 sql:allow-execute 权限）；`home_*` 文案与首页属模板核心勿删；收尾运行 `bun run i18n:compile` 与 `bun run validate`
+- **初始化状态**：模板演示模块已移除（路由/页面/前后端 demo 业务、`demo_*` 文案、`demo:` 本地化块），`src/libs/sql` 保留为通用能力空壳（`initSql`/`getDb`，`SCHEMA_SQL` 待业务表扩展），`home_*` 文案已替换为 ebook-studio 简介；`tauri.conf.json` 身份（identifier/productName/title/endpoints/version）与 `package.json`/`Cargo.toml`/`cliff.toml` 已同步为 `ebook-studio` 0.1.0，`updater.pubkey` 待手动替换（`tauri signer generate`）。后续若需新增演示类页面，参考本条流程新建而非恢复 demo。
 - **收尾**：运行 `bun run validate` 通过后，由开发者按 Conventional Commits 手动提交

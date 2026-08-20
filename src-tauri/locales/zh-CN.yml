@@ -1,6 +1,4 @@
 _version: 1
-demo:
-  greet: "你好，%{name}！你已收到来自 Rust 的问候！"
 tray:
   toggle_window: "显示 / 隐藏"
   quit: "退出"

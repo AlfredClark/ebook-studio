@@ -36,7 +36,6 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_system_fonts::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        // SQL 演示接线（模板初始化时可随 demo 模块一并移除；schema 由前端 libs/sql 幂等建表）
         .plugin(tauri_plugin_sql::Builder::default().build())
         .setup(cores::setup_cores)
         .invoke_handler(invoke_handlers!())

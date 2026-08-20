@@ -1,17 +1,17 @@
 [package]
-name = "tauri-desktop-template"
-version = "0.5.0"
-description = "Tauri based desktop application development template"
+name = "ebook-studio"
+version = "0.1.0"
+description = "A cross platform desktop application designed to provide convenience for e-book manage"
 authors = ["Alfred Clark"]
 license = "GPL-3.0-only"
-repository = "https://github.com/alfredclark/tauri-desktop-template"
-keywords = ["tauri", "desktop", "template"]
-categories = ["gui", "development-tools::templates"]
+repository = "https://github.com/AlfredClark/ebook-studio"
+keywords = ["tauri", "desktop", "ebook"]
+categories = ["gui"]
 readme = "../README.md"
 edition = "2024"
 
 [lib]
-name = "tauri_desktop_template_lib"
+name = "ebook_studio_lib"
 crate-type = ["rlib"]
 
 [build-dependencies]

@@ -1,6 +1,4 @@
 _version: 1
-demo:
-  greet: "Hello, %{name}! You've been greeted from Rust!"
 tray:
   toggle_window: "Show / Hide"
   quit: "Quit"

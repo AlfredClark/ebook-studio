@@ -3,7 +3,7 @@
  * 窗口级监听——窗口任意位置拖入文件均触发）。
  *
  * 事件为判别联合：`enter`（含 paths）/ `over`（悬停）/ `drop`（含 paths）/ `leave`；
- * 调用方按需消费（如 demo 页以 enter/over 驱动高亮、drop 取路径）。
+ * 调用方按需消费（如以 enter/over 驱动高亮、drop 取路径）。
  * 生命周期同 listenEvent 约定：异步 resolve，调用方管理 unlisten 与 disposed 守卫。
  */
 

@@ -2,7 +2,7 @@
   import { m } from "$libs/i18n/paraglide/messages";
 </script>
 
-<!-- 静态欢迎页：模板介绍。演示功能已迁移至 /demo（greet 见 components/pages/demo），此处不承载业务逻辑 -->
+<!-- 首页欢迎页 -->
 <div class="flex h-full w-full flex-col items-center justify-center gap-6 p-6">
   <div class="flex items-center gap-6">
     <img src="/tauri.svg" alt="Tauri" class="h-20 w-auto" />

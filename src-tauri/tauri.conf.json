@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "tauri-desktop-template",
-  "version": "0.5.0",
-  "identifier": "io.github.alfredclark.tauri-desktop-template",
+  "productName": "ebook-studio",
+  "version": "0.1.0",
+  "identifier": "io.github.AlfredClark.ebook-studio",
   "build": {
     "beforeDevCommand": "bun run dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Tauri Desktop Template",
+        "title": "Ebook Studio",
         "width": 1280,
         "height": 800,
         "minWidth": 1280,
@@ -64,7 +64,7 @@
   "plugins": {
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVDQjk1RjM3MTJFN0JDNTYKUldSV3ZPY1NOMSs1N04wdjh3aFVGbGVVakw5RCtiZ3VDS1hNK2thK0dkUXRFTUpYam1LS2JuRGUK",
-      "endpoints": ["https://github.com/alfredclark/tauri-desktop-template/releases/latest/download/latest.json"],
+      "endpoints": ["https://github.com/AlfredClark/ebook-studio/releases/latest/download/latest.json"],
       "windows": {
         "installMode": "passive"
       }
