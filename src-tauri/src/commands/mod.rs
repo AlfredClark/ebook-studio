@@ -18,6 +18,7 @@ macro_rules! invoke_handlers {
             $crate::commands::env::is_always_on_top_supported,
             $crate::commands::projects::list_projects,
             $crate::commands::projects::create_project,
+            $crate::commands::projects::update_project,
             $crate::commands::projects::get_project,
             $crate::commands::projects::delete_project,
             $crate::commands::projects::batch_delete_projects,

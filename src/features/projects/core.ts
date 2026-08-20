@@ -3,7 +3,7 @@
  */
 
 import { invokeCommand } from "$libs/ipc";
-import type { CreateProjectInput, Project } from "./types";
+import type { CreateProjectInput, Project, UpdateProjectInput } from "./types";
 
 /**
  * 列出项目（后端扫描 Projects 目录）
@@ -20,6 +20,15 @@ export async function listProjects(): Promise<Project[] | null> {
  */
 export async function createProject(input: CreateProjectInput): Promise<Project | null> {
   return invokeCommand<Project>("create_project", { payload: input });
+}
+
+/**
+ * 更新项目
+ * @param input 更新输入（含 identifier 与可选覆盖文件）
+ * @returns 更新后的项目，失败返回 null
+ */
+export async function updateProject(input: UpdateProjectInput): Promise<Project | null> {
+  return invokeCommand<Project>("update_project", { payload: input });
 }
 
 /**

@@ -2,7 +2,7 @@
 
 ## 项目说明
 
-本项目 ebook-studio 是一个为电子书管理提供便利的跨平台桌面应用，基于 Tauri 2 + SvelteKit 5 + TypeScript + Rust 构建。已集成系统托盘、全局快捷键、开机自启、单实例、自动更新、对话框、文件系统、系统信息、剪贴板、多语言、日志、窗口状态记忆等桌面应用常见能力，当前保留首页、设置、关于三个核心页面，演示模块已移除。
+本项目 ebook-studio 是一个为电子书管理提供便利的跨平台桌面应用，基于 Tauri 2 + SvelteKit 5 + TypeScript + Rust 构建。已集成系统托盘、全局快捷键、开机自启、单实例、自动更新、对话框、文件系统、系统信息、剪贴板、多语言、日志、窗口状态记忆等桌面应用常见能力，当前保留首页、项目、设置、关于四个核心页面（项目含列表与新建子页面）及创建流程，演示模块已移除，首个核心业务 projects 已落地。
 
 - 项目名：ebook-studio
 - 简介：A cross platform desktop application designed to provide convenience for e-book manage
@@ -12,10 +12,10 @@
 
 ## 技术栈
 
-- **前端**：SvelteKit 5 / Svelte 5 / TypeScript / Vite / Tailwind CSS v4 / shadcn-svelte，包管理器 bun
-- **后端**：Tauri 2 / Rust（edition 2024），Cargo workspace（成员为 `src-tauri`）
+- **前端**：SvelteKit 5 / Svelte 5 / TypeScript / Vite / Tailwind CSS v4 / shadcn-svelte，包管理器 bun；业务依赖 paneforge（Resizable）、`@internationalized/date`（Calendar）
+- **后端**：Tauri 2 / Rust（edition 2024），Cargo workspace（成员为 `src-tauri`）；业务依赖 `chrono`（RFC3339）、`uuid`（`urn:uuid`）、`base64`（封面 data URL）
 - **国际化**：前端 Paraglide（inlang），后端 rust-i18n
-- **集成能力**：系统托盘、全局快捷键、开机自启、单实例、自动更新、对话框、文件系统、系统信息、剪贴板、文件拖放、应用菜单（macOS）、通知、日志、窗口状态记忆、窗口置顶（环境能力探测）、SQLite 本地数据库（tauri-plugin-sql，能力保留，业务表待扩展）
+- **集成能力**：系统托盘、全局快捷键、开机自启、单实例、自动更新、对话框、文件系统、系统信息、剪贴板、文件拖放、应用菜单（macOS）、通知、日志、窗口状态记忆、窗口置顶（环境能力探测）、SQLite 本地数据库（tauri-plugin-sql，能力保留，业务表待扩展；projects 真相源为文件系统，见后）
 - **质量工具**：ESLint / Stylelint / Prettier / Clippy / rustfmt / Vitest 单测 / Husky + lint-staged
 - **授权**：GPL-3.0-only
 
@@ -28,40 +28,42 @@
 ├── src/                            # 前端（SvelteKit + TypeScript）
 │   ├── components/                 # 业务组件（按性质分层：layouts/pages/ui/widgets）
 │   │   ├── layouts/                # 布局系统（LayoutContainer 容器 + 布局注册表 + parts/ 布局部件）
-│   │   │   └── parts/              # 布局骨架部件（TabsNavBar 导航条 + WindowControl 窗口控制 + nav-items 导航数据）
+│   │   │   └── parts/              # 布局骨架部件（TabsNavBar 导航条 + WindowControl 窗口控制 + AppSidebar 侧边栏 + SidebarTrigger + nav-items 导航数据含 getActiveNavItem）
 │   │   ├── pages/                  # 页面级组件（与 routes/(main)/ 页面一一对应）
 │   │   │   ├── about/              # 关于页组件（AppAbout / SystemAbout）
+│   │   │   ├── projects/           # 项目页组件（ProjectPage 列表+详情双栏 + CreateProjectPage 创建表单含拖放/Calendar）
 │   │   │   └── settings/           # 设置页组件（Appearance / SystemSettings）
-│   │   ├── ui/                     # shadcn-svelte 生成组件（仅经 CLI 添加，components.json 管理）
+│   │   ├── ui/                     # shadcn-svelte 生成组件（仅经 CLI 添加，components.json 管理，当前 25 个：alert-dialog/badge/button/calendar/card/checkbox/command/dialog/input/input-group/label/popover/resizable/scroll-area/select/separator/sheet/sidebar/skeleton/slider/sonner/switch/tabs/textarea/tooltip）
 │   │   └── widgets/                # 通用小组件（自包含、可插拔，按功能分子目录）
 │   │       ├── icons/              # 品牌/自定义图标（GithubIcon）
 │   │       └── overlay/            # 浮层组件（ConfirmDialog 确认对话框 + TooltipButton 提示按钮，复合组件式）
-│   ├── features/                   # 业务功能模块（与后端 src-tauri/src/features 命名镜像——前端每功能一个目录，后端为扁平 .rs 模块，结构不镜像）
+│   ├── features/                   # 业务功能模块（与后端 src-tauri/src/features 命名镜像——前端每功能一个目录，后端为扁平 .rs 模块，结构不镜像，当前 projects/{core,types,mock,index}.ts）
 │   ├── libs/                       # 前端模块库
 │   │   ├── drag-drop/              # 文件拖放（封装核心 API onDragDropEvent，窗口级监听，免权限）
 │   │   ├── errors/                 # 错误处理
 │   │   ├── events/                 # 事件契约（事件名常量 + payload 类型 + listenEvent 封装）
 │   │   ├── hooks/                  # shadcn-svelte 生成区（如 is-mobile.svelte.ts，components.json hooks 别名；同 components/ui 豁免规则）
-│   │   ├── i18n/                   # 国际化（Paraglide 编译产物、消息文件与 inlang 项目配置）
+│   │   ├── i18n/                   # 国际化（Paraglide 编译产物、消息文件与 inlang 项目配置，消息源 src/libs/i18n/messages/{locale}.json）
 │   │   ├── ipc/                    # Tauri 命令调用封装（invokeCommand + 类型定义）
 │   │   ├── logger/                 # 日志（对接 tauri-plugin-log）
+│   │   ├── notifications/          # 通知（对接 tauri-plugin-notification）
 │   │   ├── overlay/                # 浮层（toast 统一出口）
 │   │   ├── process/                # 进程能力（重导出 tauri-plugin-process 的 exit/relaunch）
-│   │   ├── sql/                    # SQL 数据层（封装 tauri-plugin-sql：initSql 建表 + 类型化读写，业务表在此扩展，当前为通用空壳）
+│   │   ├── sql/                    # SQL 数据层（封装 tauri-plugin-sql：initSql 建表 + 类型化读写，业务表在此扩展，当前为通用空壳，projects 未使用 sql）
 │   │   ├── stores/                 # 全局状态（settings 偏好 + store 工厂）
 │   │   ├── system/                 # 系统配置（config 快照缓存 + toggle 业务 + 共享响应式状态）
 │   │   ├── updater/                # 自动更新（check/install + 模块级状态 state.svelte.ts）
 │   │   └── utils/                  # 可复用散装工具（跨模块通用，如 system-fonts 系统字体列表）
-│   ├── routes/                     # 页面与布局（(main) 分组为主窗口页面）
+│   ├── routes/                     # 页面与布局（(main) 分组为主窗口页面：/(home)、/projects、/projects/create、/settings、/about）
 │   ├── styles/                     # 样式（app.css 为唯一入口；themes/ 存放主题文件）
 │   │   └── themes/                 # 主题（index.css 聚合 import；index.ts 导出 themeNames/ThemeName）
 │   ├── app.html                    # 应用 HTML 模板（首帧 lang 硬编码）
 │   └── hooks.client.ts             # 客户端钩子
 ├── src-tauri/                      # 后端（Rust，Cargo workspace 成员）
 │   ├── capabilities/               # Tauri 权限配置（default / plugins）
-│   ├── locales/                    # rust-i18n 语言文件
+│   ├── locales/                    # rust-i18n 语言文件（en.yml/zh-CN.yml，含 menu.projects）
 │   ├── src/
-│   │   ├── commands/               # Tauri 命令（config / env）
+│   │   ├── commands/               # Tauri 命令（config / env / projects）
 │   │   ├── cores/                  # 核心模块
 │   │   │   ├── autostart.rs        # 开机自启
 │   │   │   ├── config.rs           # 配置管理
@@ -76,11 +78,11 @@
 │   │   │   ├── shortcut.rs         # 全局快捷键
 │   │   │   ├── tray.rs             # 系统托盘
 │   │   │   └── window_state.rs     # 窗口状态记忆
-│   │   ├── features/               # 业务功能模块（新增功能放此处）
+│   │   ├── features/               # 业务功能模块（当前 projects.rs：Dublin Core 文件系统，含 ProjectMetadata/CreateProjectInput + list/create/delete/batchDelete/get/resolveAsset/getFileStats/readImageAsDataURL）
 │   │   ├── lib.rs                  # 应用初始化
 │   │   └── main.rs                 # 程序入口
 │   ├── build.rs                    # Tauri 构建脚本
-│   └── tauri.conf.json             # Tauri 应用配置
+│   └── tauri.conf.json             # Tauri 应用配置（含 img-src asset: http://asset.localhost 支持封面预览 data URL/asset）
 ├── scripts/                        # Node 工具脚本（bump-version.mjs 版本提升）
 ├── static/                         # 前端静态资源
 ├── .editorconfig                   # 编辑器统一风格
@@ -126,6 +128,7 @@
 - **系统能力编排**：toggle 系列（读当前值取反 → OS 副作用 → 写回 config）等对 cores 系统能力的编排可直接写于命令层（依赖方向允许 commands 直调 cores）；纯业务逻辑编排才下沉 features
 - **命令注册**：新增命令后追加到 `commands/mod.rs` 的 `invoke_handlers!` 宏（lib.rs 无需改动）
 - **环境探测**：`env::is_always_on_top_supported` 查询窗口置顶能力（Linux Wayland 下 GTK keep_above 无效，前端据此隐藏置顶按钮；前端 `WindowControl`/`SystemSettings` 的置顶与关闭行为 UI 依赖该命令）
+- **项目命令**：`projects` 域提供 `list_projects` / `create_project`（`payload: CreateProjectInput`） / `get_project` / `delete_project` / `batch_delete_projects` / `resolve_project_asset` / `get_file_stats` / `read_image_as_data_url`，前端经 `invokeCommand` 调用（如 `invokeCommand("create_project", { payload: { title, language } })`）
 - **文档示例**：函数文档注明前端调用示例（如 `invokeCommand("set_locale", { locale: "zh-CN" })`）
 
 ### 统一响应协议
@@ -141,6 +144,7 @@
 - **发射约定**：emit 失败仅 `log::error!`（如前端尚未就绪），不阻断调用方流程
 - **传输机制决策**：后端 → 前端单次通知用事件；流式/进度/批量用 Channel（有序、完成语义、背压）；前端 → 后端请求用 command，不经事件
 - **退出请求**：托盘退出菜单 / Ctrl+Q 不直接 `app.exit`——经 `app:request-exit` 事件交前端按 closeBehavior 偏好编排退出流程（前端监听于 `WindowControl`，布局注册表保证单实例），尊重关闭行为偏好
+- **菜单导航**：`MenuPage` 枚举含 `Home/Projects/Settings/About`（`serde lowercase` 与前端 `MenuPage` 一致），`emit_menu_navigate` 用于 macOS 菜单及全局快捷键
 - **升级阈值**：事件 ≤5 个维持轻量契约层；超过后升级全量契约（payload 全 serde 结构体 + AGENTS.md 事件清单章节）；**不建自建事件总线/中间件**
 
 ### features 模块约定
@@ -148,6 +152,7 @@
 - **模块结构**：每个功能一个模块，模块内函数返回 `AppResult<T>`，不直接构造 `Response`
 - **能力复用**：可复用 cores 的系统能力（配置、日志、i18n），只调其公开接口，不重写
 - **模块文档**：`//!` 说明职责与涉及的真相源
+- **项目业务**：`features/projects.rs` 真相源为 `APPDATA/Projects/<uuid>/metadata.json + sources/{cover.<ext>,content.txt}`（`uuid` 为 `urn:uuid:<uuid>` 的后段，目录名即 uuid），Dublin Core 字段 `title/language` 必填、`creator/contributor/publisher/date/subjects(/分割)/description(换行分割→Vec<String>)/rights/source/relation/coverage` 选填、`identifier/created/modified/modifiedMs/cover/content` 系统生成；`subjects` 以 `/` 切分、`description` 以换行切分存 `Vec<String>`；封面仅 `png/jpg/jpeg/webp/gif/bmp` 且限 `10MB`（`read_image_as_data_url`），正文仅 `txt`，拷贝经 `std::fs::copy` 固定命名 `cover.<ext>/content.txt`，失败回滚整目录；列表扫描 `Projects` 目录解析 `metadata.json` 并按 `modifiedMs desc` 排序，损坏项 `log::warn` 跳过
 
 ### cores 模块约定
 
@@ -156,7 +161,7 @@
 - **错误分级**：可恢复错误不阻断启动（`log::warn!` 后继续，如自启/快捷键同步失败）；关键错误返回 `Err` 阻断
 - **损坏恢复**：配置损坏备份为 `*.corrupt` 后重建，不阻断启动
 - **插件装配**：需业务配置/事件的插件经 cores 的 `plugin()` 统一封装（如 `config::plugin()` 装配 store、`logger::plugin()` 配置日志目标、`shortcut::plugin()` 注册快捷键 handler），lib.rs 仅链式调用，不写插件细节
-- **官方插件**：无需定制的插件（opener/clipboard-manager/process/notification/system-fonts/dialog/fs/os/updater/sql）直接在 lib.rs 以 `tauri_plugin_xxx::init()` 注册；`sql` 为通用能力保留，业务表由前端 `libs/sql` 幂等建表
+- **官方插件**：无需定制的插件（opener/clipboard-manager/process/notification/system-fonts/dialog/fs/os/updater/sql）直接在 lib.rs 以 `tauri_plugin_xxx::init()` 注册；`sql` 为通用能力保留，业务表由前端 `libs/sql` 幂等建表（`projects` 未使用 sql，选用文件系统）
 - **注册顺序**：单实例插件置于链首——尽早注册单例锁，避免窗口建好后回调竞态
 - **职责分离**：事件/回调逻辑放 plugin()（如快捷键 handler、单实例聚焦回调），setup() 只做初始化与状态同步，不混写
 - **权限同步**：新增插件且前端需调用其 API 时，同步在 `capabilities/plugins.json` 追加权限（如 `global-shortcut:default`）
@@ -175,7 +180,7 @@
 ### 日志约定
 
 - **日志库**：使用 `log` crate（前端经 tauri-plugin-log 共用同一链路）
-- **消息前缀**：日志消息带 `[模块名]` 前缀（如 `[config]`、`[tray]`、`[panic]`）
+- **消息前缀**：日志消息带 `[模块名]` 前缀（如 `[config]`、`[tray]`、`[panic]`、`[projects]`）
 - **级别**：`info` 正常事件 / `warn` 可恢复失败 / `error` 出错
 
 ### 文档注释
@@ -187,7 +192,7 @@
 ### 国际化
 
 - **注册**：`rust_i18n::i18n!("locales", fallback = "en")` 宏在 lib.rs 顶部注册，新增语言只需新增 `locales/{lang}.yml`
-- **文案**：一律经 `t!("key")` 取，不硬编码中英文；消息源加在 `locales/*.yml`（缺失回退 `en`）。例外：tauri 预设项/系统固定文案保持原文（预设文案固定不可本地化，如 macOS 菜单 Edit 组，见 cores/menu.rs 已知边界）
+- **文案**：一律经 `t!("key")` 取，不硬编码中英文；消息源加在 `locales/*.yml`（缺失回退 `en`）。例外：tauri 预设项/系统固定文案保持原文（预设文案固定不可本地化，如 macOS 菜单 Edit 组，见 cores/menu.rs 已知边界）；`menu.projects` 已在 `locales/en.yml`/`zh-CN.yml` 同步
 - **语言校验**：语言标签经 `Locale` 新类型校验，非法值拒绝写入；`system` 为「跟随系统」模式哨兵值（cores/locale.rs 的 `SYSTEM_LOCALE`），config 存此值时运行期经 `Locale::from_system` 解析（tauri-plugin-os 取系统标签，完整标签/主语言子标签精确匹配，不匹配回退默认）
 - **跟随系统模式**：locale 为 `system`（首启/重置默认）时语言跟随系统，解析留待运行期；固定标签则按存储值；已知边界——运行期系统语言变更不自动跟随（无 OS 监听），重启应用后生效
 
@@ -199,16 +204,16 @@
 
 ### 注意事项
 
-- **依赖添加**：新增 Rust 依赖统一加到 `src-tauri/Cargo.toml`；与前端成对的 Tauri 能力需同步 npm 包与 capabilities 权限（见前端注意事项）
+- **依赖添加**：新增 Rust 依赖统一加到 `src-tauri/Cargo.toml`；与前端成对的 Tauri 能力需同步 npm 包与 capabilities 权限（见前端注意事项）；`projects` 新增 `chrono/uuid/base64` 无需额外权限（纯 Rust 逻辑）
 
 ## 前端开发规范（src）
 
 ### 架构与模块
 
 - **SPA 模式**：`+layout.ts` 关闭 SSR（`ssr = false`）；adapter-static + fallback 单页渲染，适配 Tauri 本地文件加载
-- **routes/**：分组路由——`(main)` 组存放主窗口页面（首页 `/`、设置 `/settings`、关于 `/about`）；页面内容经 `(main)/+layout.svelte` 包裹 LayoutContainer 渲染
-- **components/**：业务组件目录——按性质分层：`pages/` 页面级组件（仅被 routes/(main)/ 对应页面消费，与页面一一对应）、`widgets/` 自包含可插拔小组件、`layouts/` 布局系统、`ui/` shadcn 生成组件（svelte.config.ts 已预留 `$components` 别名）
-- **components/ui/**：shadcn-svelte 生成组件（`$components/ui` 别名）——经 `bunx shadcn-svelte add <name>` 拉取，源码即项目代码，允许按需修改（尽可能不修改，本地修改后升级组件时须注意差异）；**生成区禁手动添加组件**，需定制的基础组件放 components 对应功能分类；别名配置见 components.json（ui=$components/ui、utils=$libs/utils/shadcn）
+- **routes/**：分组路由——`(main)` 组存放主窗口页面（首页 `/`、项目 `/projects`、新建项目 `/projects/create`、设置 `/settings`、关于 `/about`）；页面内容经 `(main)/+layout.svelte` 包裹 LayoutContainer 渲染，`(main)/+layout.svelte` 监听 `menu:navigate`（含 `projects`）统一 `goto(resolve(...))`
+- **components/**：业务组件目录——按性质分层：`pages/` 页面级组件（仅被 routes/(main)/ 对应页面消费，与页面一一对应，当前含 `projects/ProjectPage + CreateProjectPage`）、`widgets/` 自包含可插拔小组件、`layouts/` 布局系统、`ui/` shadcn 生成组件（svelte.config.ts 已预留 `$components` 别名）
+- **components/ui/**：shadcn-svelte 生成组件（`$components/ui` 别名）——经 `bunx shadcn-svelte add <name>` 拉取，源码即项目代码，允许按需修改（尽可能不修改，本地修改后升级组件时须注意差异）；**生成区禁手动添加组件**，需定制的基础组件放 components 对应功能分类；别名配置见 components.json（ui=$components/ui、utils=$libs/utils/shadcn），当前 25 个（`alert-dialog/badge/button/calendar/card/checkbox/command/dialog/input/input-group/label/popover/resizable/scroll-area/select/separator/sheet/sidebar/skeleton/slider/sonner/switch/tabs/textarea/tooltip`，其中 `calendar` 依赖 `@internationalized/date`，`resizable` 依赖 `paneforge`）
 - **libs/**：前端模块库，每模块的文件约定——`index.ts` 统一出口、`core.ts` 实现、`types.ts` 类型契约；跨组件共享的 runes 模块级状态放 `state.svelte.ts`（如 updater 的 `update` 状态，ESM 仅加载一次）
 - **模块出口**：`index.ts` 为统一出口 + 组装点——重导出各文件（`export { x } from "./core"` + `export * from "./types"`），并组装跨文件的实例（如 stores 的 `settings`），具体实现仍留在各功能文件；无自有类型契约可省略 `types.ts`（如 logger/updater 复用 npm 包类型）
 - **类型归属**：`types.ts` 仅存放模块通用类型（跨文件/跨模块复用，如 stores 的 `Store` / `StoreDefinition` / `ColorScheme` / `LayoutName`）；少数文件内部使用的类型直接在文件内定义，不写入 types.ts
@@ -220,7 +225,7 @@
 
 ### 业务功能（features）
 
-- **归属判据**：通用可复用 → `libs/`；与具体业务绑定、不通用 → `features/`（与后端 `src-tauri/src/features` 命名镜像、结构不镜像——前端每功能一个目录，后端为扁平 `.rs` 模块）
+- **归属判据**：通用可复用 → `libs/`；与具体业务绑定、不通用 → `features/`（与后端 `src-tauri/src/features` 命名镜像、结构不镜像——前端每功能一个目录，后端为扁平 `.rs` 模块，当前 `projects` 已落地 `{core.ts,types.ts,mock.ts,index.ts}`，Dublin 字段与后端 `ProjectMetadata` 对齐，`description` 为 `string[]` 每行一元素）
 - **IPC 直调**：features 可直接调 `invokeCommand`（等同后端 commands+features 合并层，不复刻 commands 薄层）；失败返回 null，调用方 `?? 兜底`
 - **模块约定**：沿用 libs——`index.ts` 统一出口、`core.ts` 实现、`types.ts` 契约、`state.svelte.ts` runes 状态
 - **消费关系**：页面级组件（components/pages/）调 features；features 可调 libs（ipc/logger/stores）与官方插件
@@ -248,14 +253,14 @@
 - **注册表**：`index.ts` 导出 `layouts: Record<LayoutName, Component>`——新增布局追加组件与 `LayoutName` 变体（Record 约束编译期强制同步）；`LayoutName` 为跨模块通用类型（stores/types.ts，与 `settings.layout` 偏好值域一致）
 - **容器**：`LayoutContainer` 订阅 `settings.layout` 经注册表动态渲染，非法/未知值回退 `layouts.default`；`(main)/+layout.svelte` 包裹 children 统一走容器
 - **布局组件**：各布局（Default/Dashboard）仅实现基础骨架（header/nav/main/footer），children snippet 透传页面内容
-- **布局部件**：骨架部件（TabsNavBar 导航条、WindowControl 窗口控制 + nav-items 导航数据）放 `layouts/parts/`——被布局专属消费、非通用组件，与 `widgets/`（自包含可插拔）分离；各布局组件在此组合骨架
+- **布局部件**：骨架部件（TabsNavBar 导航条、WindowControl 窗口控制、AppSidebar 侧边栏、SidebarTrigger、nav-items 导航数据含 `getActiveNavItem`）放 `layouts/parts/`——被布局专属消费、非通用组件，与 `widgets/`（自包含可插拔）分离；各布局组件在此组合骨架；`nav-items.ts` 导出 `getActiveNavItem(pathname, items)` 按最长前缀匹配（`"/"` 精确，其余 `pathname===href || startsWith(href+"/")` 按 `href` 长度降序），使 `/projects/create` 仍高亮 `Projects`，`TabsNavBar`/`AppSidebar`/`Dashboard` 均经此判定
 
 ### IPC 调用
 
 - **封装**：一律经 `$libs/ipc` 的 `invokeCommand<T>(command, args?)`，不直接调 `invoke`
 - **解包**：自动解包统一响应——业务失败返回 null 并写日志；调用处用 `?? 默认值` 兜底
 - **参数**：args 键名与 Rust 命令参数一致（Tauri 驼峰转换）
-- **类型对齐**：前端接口（`Response<T>` / `SystemConfig`）与 Rust 侧 cores 一一对应，后端类型变更时同步更新 types.ts
+- **类型对齐**：前端接口（`Response<T>` / `SystemConfig` / `Project`）与 Rust 侧 cores/features 一一对应，后端类型变更时同步更新 types.ts
 
 ### 系统配置（libs/system）
 
@@ -278,12 +283,12 @@
 - **能力来源**：原生文件选择/保存/消息/询问框经 `@tauri-apps/plugin-dialog` 提供的 `open` / `save` / `message` / `ask` / `confirm` API 调用，**不经 `invokeCommand`**——官方插件自带 IPC 封装，与 notification 同模式
 - **权限**：`dialog:default`（capabilities/plugins.json）
 - **返回约定**：`open`/`save` 用户取消时返回 `null`；`ask`/`confirm` 返回用户选择（boolean）；`message` 完成时 resolve
-- **调用示例**：`const file = await open({ multiple: false, filters: [{ name: "文本", extensions: ["txt"] }] })`
+- **调用示例**：`const file = await open({ multiple: false, filters: [{ name: "文本", extensions: ["txt"] }] })`；`projects` 创建页封面/正文均经此 API（封面 `Images`、正文 `txt`），支持拖放（`libs/drag-drop` 窗口级 `onDragDropEvent`）+ 点击选择双模式
 
 ### 应用内确认对话框（ConfirmDialog）
 
 - **组件来源**：`$components/widgets/overlay/ConfirmDialog`（复合组件式，shadcn Alert Dialog，WebView 内渲染、随主题联动）——**无全局单例**，调用方局部定义使用，经 `{#snippet trigger()}` 传入真实触发按钮（必传）
-- **使用场景**：需要应用主题化/自定义排版的关键操作二次确认（如关闭窗口）；系统级交互仍走 `@tauri-apps/plugin-dialog`（原生 `ask`/`confirm`）或文件选择
+- **使用场景**：需要应用主题化/自定义排版的关键操作二次确认（如关闭窗口、删除项目）；系统级交互仍走 `@tauri-apps/plugin-dialog`（原生 `ask`/`confirm`）或文件选择
 - **props**：`trigger`（必传，接收 bits-ui 委托 props 须 `{...props}` 展开且勿覆盖 onclick）、`open`（可选 $bindable，仅需程序化控制时绑定）、`title`/`message`（调用处已 i18n）、`variant: "default" | "destructive"`（危险操作红色确认按钮）、`confirmLabel`/`cancelLabel`（默认 `m.common_confirm()` / `m.common_cancel()`）、`onConfirm`/`onCancel`
 - **语义**：确认按钮 → `onConfirm`（对话框自动关闭）；取消按钮/ESC/遮罩点击 → 仅关闭并触发 `onCancel`；内部 `confirmed` 标志防止 Action 关窗误触 onCancel
 - **双委托**：触发按钮同时需要其他 bits-ui 触发器（如 Tooltip）时，优先用 `TooltipButton` 的 `extraProps` 吸收外部委托 props（内部经 mergeProps 链式合并 ref/事件，勿用对象展开）；手写 `mergeProps` 仅保留给特殊场景
@@ -291,9 +296,9 @@
 
 ### 文件系统（fs）
 
-- **能力来源**：文件读写/查询经 `@tauri-apps/plugin-fs` 提供的 API 调用（如 `exists`），**不经 `invokeCommand`**——官方插件自带 IPC 封装，与 notification/dialog 同模式
+- **能力来源**：文件读写/查询经 `@tauri-apps/plugin-fs` 提供的 API 调用（如 `exists`），**不经 `invokeCommand`**——官方插件自带 IPC 封装，与 notification/dialog 同模式；`projects` 的实际持久化走后端 `std::fs`（`APPDATA/Projects/<uuid>`），前端仅经命令间接访问，不直连 `plugin-fs` 写
 - **权限**：`fs:default`（只读 + mkdir，无写入命令）——`read_dir`/`read_file`/`read_text_file`/`read_text_file_lines`/`read_text_file_lines_next`/`exists`/`mkdir`，scope 覆盖五个应用专属目录（$APPCONFIG/$APPDATA/$APPLOCALDATA/$APPCACHE/$APPLOG）及其递归子目录，默认拒绝 webview 数据目录（Linux $APPLOCALDATA、Windows $APPLOCALDATA/EBWebView）；**不含文件写入**，写文件（writeFile/remove/rename 等）须显式追加 `fs:allow-*` 权限；新增 fs 能力时按需扩展权限与 scope
-- **路径约定**：`BaseDirectory.AppData` 展开即 `$APPDATA`（store 插件经 AppData 解析，config.json 真实落盘于此），调用路径须落在权限 scope 内，否则被拒绝
+- **路径约定**：`BaseDirectory.AppData` 展开即 `$APPDATA`（store 插件经 AppData 解析，config.json 真实落盘于此），调用路径须落在权限 scope 内，否则被拒绝；`projects` 的 `APPDATA/Projects` 由后端 `app.path().resolve("Projects", BaseDirectory::AppData)` 解析
 - **调用示例**：`await exists("config.json", { baseDir: BaseDirectory.AppData })`
 
 ### 系统信息（os）
@@ -321,24 +326,25 @@
 
 - **日志库**：经 `$libs/logger`（重导出 @tauri-apps/plugin-log）写入，与后端共用同一链路（LogDir 落盘）
 - **初始化**：应用启动（+layout.svelte onMount）调用 `initLogger()` 一次（attachConsole 控制台镜像）
-- **消息前缀**：日志消息带 `[模块名]` 前缀，与后端风格对齐（如 `[ipc]`、`[updater]`、`[error]`）
+- **消息前缀**：日志消息带 `[模块名]` 前缀，与后端风格对齐（如 `[ipc]`、`[updater]`、`[error]`、`[projects]`）
+- **已知边界**：文件统计与封面预览由后端 `get_file_stats` / `read_image_as_data_url` 提供，非前端直读
 
 ### 国际化
 
 - **文案**：一律经 paraglide 编译产物 `m.xxx()` 取，不硬编码；动态文案用 `ParaglideMessage` 组件
-- **键命名**：`<前缀>_<具体含义>`（全小写 snake_case），前缀按归属域——`nav_` 导航标签 / `window_control_` 窗口控制 / `settings_` 设置项 / `about_` 关于页 / `theme_` 主题 / `layout_` 布局 / `language_` 语言 / `footer_` 页脚 / `boundary_` 错误边界 / `common_` 通用文案（确认/取消按钮）/ `home_` 首页文案 / `sidebar_` 侧边栏 / `updater_` 更新提示；禁止裸名词键（如 `welcome`）。已移除 `demo_` 演示前缀
-- **消息源**：`messages/{locale}.json`；新增语言需同步 `project.inlang/settings.json` 的 locales；改动后运行 `bun run i18n:compile`
+- **键命名**：`<前缀>_<具体含义>`（全小写 snake_case），前缀按归属域——`nav_` 导航标签 / `window_control_` 窗口控制 / `settings_` 设置项 / `about_` 关于页 / `theme_` 主题 / `layout_` 布局 / `language_` 语言 / `footer_` 页脚 / `boundary_` 错误边界 / `common_` 通用文案（确认/取消按钮）/ `home_` 首页文案 / `sidebar_` 侧边栏 / `updater_` 更新提示 / `projects_` 项目域（含 `projects_create_*` 创建、`projects_detail_*` 详情、`projects_sort_*` 排序、`projects_delete_*` 删除、`projects_batch_*` 批量）；禁止裸名词键（如 `welcome`）。已移除 `demo_` 演示前缀
+- **消息源**：`src/libs/i18n/messages/{locale}.json`（`project.inlang/settings.json` 的 `pathPattern: ./messages/{locale}.json` 相对 `project.inlang` 目录）；新增语言需同步 `project.inlang/settings.json` 的 locales；改动后运行 `bun run i18n:compile`
 - **locale 真相源**：config.json（后端）为准，存储模式值为 `system`（跟随系统）或具体标签；`changeLocale` 先写后端成功才切前端（双写，set_locale 返回解析后的具体标签喂 paraglide）；`initLocale` 启动时同步（system 模式经 `resolve_locale` 命令解析），失同步以 config 为准 reload 自愈
 - **首帧**：app.html 硬编码 lang="en"，由 initLocale 运行期更新 `document.documentElement.lang`
 
 ### 注意事项
 
-- **成对依赖**：前端用到的 Tauri 能力需 npm 包 + Rust 侧 tauri-plugin 依赖 + `capabilities/plugins.json` 权限三者齐备（如 notification/updater/system-fonts/clipboard-manager/sql——sql 已保留，含 `sql:default` + `sql:allow-execute`）
+- **成对依赖**：前端用到的 Tauri 能力需 npm 包 + Rust 侧 tauri-plugin 依赖 + `capabilities/plugins.json` 权限三者齐备（如 notification/updater/system-fonts/clipboard-manager/sql——sql 已保留，含 `sql:default` + `sql:allow-execute`）；`projects` 的 `dialog:default` 已用于封面/正文选择，`chrono/uuid/base64` 为纯 Rust 逻辑无需额外权限
 - **构建配置**：vite dev 端口固定 1420（strictPort），与 tauri.conf.json 的 devUrl/CSP 一致；watch 忽略 `src-tauri` 与根 `target`（Windows 上 watch 被 cargo 锁定的构建脚本 exe 会 EBUSY 崩溃）；改端口需同步改 tauri.conf.json
 - **首帧性能**：SPA 白屏经「单入口打包」缓解——`svelte.config.ts` 配 `kit.output.bundleStrategy: "single"` 收敛 JS 单入口（消除 modulepreload/动态 import 请求链，JS 仍外链不受 CSP 约束）
 - **全局常量注入**：经 vite `define` 整体注入配置对象（`__APP_TAURI_CONF__` 为整份 tauri.conf.json、`__APP_PKG__` 为整份 package.json），消费方按需取属性；类型在 `src/vite-env.d.ts` 经 `import type ... from "*.json"` 引用 JSON 字面量推导（天然同步）；新增配置须同步 eslint.config.ts 的 `viteDefineGlobals`；watch 忽略 src-tauri，改配置需重启 dev 生效
 - **Tailwind v4**：经 `@tailwindcss/vite` 插件编译（vite.config.ts，无 postcss 配置）；`src/styles/app.css` 为唯一入口（`@import "tailwindcss"` + `@import "./themes/index.css"`）；**主题真相源在 `src/styles/themes`**（shadcn 语义 token，换主题只改主题文件）；Tailwind 变量映射（`@theme inline`，`--color-*` 桥接语义 token）集中在 app.css 单一真相源，主题文件只承载变量值；新增主题在 themes/ 下直接以名字命名（neutral.css、blue.css…），**经 `themes/index.css` 聚合 import + `themes/index.ts` 追加 `themeNames` + AppearanceSettings 的 label 映射（options 由 themeNames 驱动）**，运行期经 `data-theme` 切换；**主题可分完整 token 与局部覆盖两类——完整主题含全量语义 token（浅/深），局部覆盖主题基于 neutral 基底仅覆盖差异 token（如 primary/chart/sidebar），`data-theme` 未覆盖 token 回落基底值**；`@theme`/`@custom-variant`/`@apply` 等 at-rule 与 oklch 数字写法已在 stylelint 豁免（.stylelintrc.json）
-- **CSP**：bits-ui 浮层组件（popover/dropdown/tooltip）经 floating-ui 内联 style 定位，生产 csp 的 style-src 必须含 `'unsafe-inline'`（已配置，勿删）
+- **CSP**：bits-ui 浮层组件（popover/dropdown/tooltip）经 floating-ui 内联 style 定位，生产 csp 的 style-src 必须含 `'unsafe-inline'`（已配置，勿删）；封面预览经后端 `read_image_as_data_url` 返回 `data:` URL，不走 `asset:` 协议，`tauri.conf.json` 的 `img-src` 已含 `asset: http://asset.localhost` 兼容 `convertFileSrc` 回退
 - **主题**：深色模式为 class 策略——`document.documentElement` 挂 `.dark`（styles/app.css `@custom-variant dark`）；**暗色偏好经 mode-watcher 管理**——根布局挂 `<ModeWatcher />`（应用/移除 `.dark` + `color-scheme`），偏好经 `userPrefersMode`（`system | light | dark`，持久化于 `mode-watcher-mode` key，system 走 prefers-color-scheme），切换用 `setMode`；消费组件直接 import mode-watcher（如 sonner 的 `theme={mode.current}`）
 - **prettier**：prettier-plugin-tailwindcss 自动排序 Tailwind 类（`tailwindStylesheet` 指向 src/styles/app.css，插件顺序 svelte 在前）
 - **eslint 配置**：`.svelte.ts` runes 模块纳入 svelte 解析器块（extraFileExtensions）；`scripts/**/*.mjs` 配置 Node globals；`src/components/ui/**` 关闭 `svelte/no-navigation-without-resolve`（按钮类组件 href 为动态绑定，规则误报）
@@ -373,5 +379,5 @@
 
 - **后端**：`features/` 写业务逻辑（返回 `AppResult<T>`）→ `commands/` 写命令（校验 + 调 features + 转 `Response<T>`）→ 追加 `invoke_handlers!` 宏 → 文案加 `locales/*.yml`；涉及新能力时同步 Cargo.toml 依赖与 capabilities 权限
 - **前端**：业务逻辑写 `src/features/<功能>/`（可直接调 `invokeCommand`）→ 文案经 `m.xxx()` 并加入 `messages/*.json` → 运行 `bun run i18n:compile`；新 UI 偏好经 `storeDef` + `createStoreGroup` 组装进 `settings`（stores/index.ts），偏好残留校验等初始化在模块作用域显式执行（如 settings.ts 启动校验）；跨组件共享的瞬时状态（非持久化偏好）用 `state.svelte.ts` runes 模块；UI 基础组件经 `bunx shadcn-svelte add <name>` 拉取到 `$components/ui`（不覆盖已有组件）
-- **初始化状态**：模板演示模块已移除（路由/页面/前后端 demo 业务、`demo_*` 文案、`demo:` 本地化块），`src/libs/sql` 保留为通用能力空壳（`initSql`/`getDb`，`SCHEMA_SQL` 待业务表扩展），`home_*` 文案已替换为 ebook-studio 简介；`tauri.conf.json` 身份（identifier/productName/title/endpoints/version）与 `package.json`/`Cargo.toml`/`cliff.toml` 已同步为 `ebook-studio` 0.1.0，`updater.pubkey` 待手动替换（`tauri signer generate`）。后续若需新增演示类页面，参考本条流程新建而非恢复 demo。
+- **初始化状态**：模板演示模块已移除，首个业务 `projects` 已落地（前端 `features/projects/{core,types,mock,index}.ts` + 后端 `src-tauri/src/features/projects.rs` + `commands/projects.rs`，真相源 `APPDATA/Projects/<uuid>/metadata.json + sources/{cover.<ext>,content.txt}`，Dublin 字段 `subjects` 以 `/` 切分、`description` 以换行切分存 `Vec<String>`，`home_*` 文案已替换为 ebook-studio 简介；`tauri.conf.json` 身份（identifier/productName/title/endpoints/version）与 `package.json`/`Cargo.toml`/`cliff.toml` 已同步为 `ebook-studio` 0.1.0，`updater.pubkey` 待手动替换（`tauri signer generate`）。后续若需新增演示类页面，参考本条流程新建而非恢复 demo。
 - **收尾**：运行 `bun run validate` 通过后，由开发者按 Conventional Commits 手动提交

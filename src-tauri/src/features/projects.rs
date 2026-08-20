@@ -115,6 +115,46 @@ pub struct CreateProjectInput {
     pub content_src: Option<String>,
 }
 
+/// 更新项目输入（前端 camelCase，需 identifier；封面/正文用 Option 区分保留/替换/移除）
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateProjectInput {
+    pub identifier: String,
+    pub title: String,
+    pub language: String,
+    #[serde(default)]
+    pub creator: Option<String>,
+    #[serde(default)]
+    pub contributor: Option<String>,
+    #[serde(default)]
+    pub publisher: Option<String>,
+    #[serde(default)]
+    pub date: Option<String>,
+    #[serde(default)]
+    pub subjects: Option<String>,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub rights: Option<String>,
+    #[serde(default)]
+    pub source: Option<String>,
+    #[serde(default)]
+    pub relation: Option<String>,
+    #[serde(default)]
+    pub coverage: Option<String>,
+    /// 封面原始绝对路径（Some(path) 替换，None 保留；配合 remove_cover 删除）
+    #[serde(default)]
+    pub cover_src: Option<String>,
+    #[serde(default)]
+    pub content_src: Option<String>,
+    /// 是否移除现有封面（cover_src 为空时生效）
+    #[serde(default)]
+    pub remove_cover: Option<bool>,
+    /// 是否移除现有正文
+    #[serde(default)]
+    pub remove_content: Option<bool>,
+}
+
 fn projects_base_dir(app: &AppHandle) -> AppResult<PathBuf> {
     app.path()
         .resolve(PROJECTS_DIR, BaseDirectory::AppData)
@@ -344,6 +384,129 @@ pub(crate) fn create_project(app: &AppHandle, input: CreateProjectInput) -> AppR
     }
 
     log::info!("[projects] created {}", identifier);
+    Ok(metadata)
+}
+
+fn remove_existing_covers(sources_dir: &Path) {
+    if let Ok(entries) = fs::read_dir(sources_dir) {
+        for e in entries.flatten() {
+            let p = e.path();
+            if let Some(name) = p.file_name().and_then(|n| n.to_str()) {
+                if name.starts_with(COVER_PREFIX) && p.is_file() {
+                    let _ = fs::remove_file(&p);
+                }
+            }
+        }
+    }
+}
+
+/// 更新项目（保留 created，刷新 modified；封面/正文支持替换/保留/移除）
+pub(crate) fn update_project(app: &AppHandle, input: UpdateProjectInput) -> AppResult<ProjectMetadata> {
+    let title = input.title.trim().to_string();
+    validate_title(&title)?;
+    let language = input.language.trim().to_string();
+    validate_language(&language)?;
+    let subjects = parse_subjects(input.subjects);
+    let description = parse_description(input.description);
+    let uuid = sanitize_uuid(&input.identifier)?;
+    let base = ensure_projects_dir(app)?;
+    let project_dir = base.join(&uuid);
+    if !project_dir.exists() {
+        return Err(AppError::new(CODE_ERROR, "[projects] 项目不存在"));
+    }
+    let meta_path = metadata_path(&project_dir);
+    let existing = read_metadata_file(&meta_path)?;
+    let sources_dir = project_dir.join(SOURCES_DIR);
+    fs::create_dir_all(&sources_dir)
+        .map_err(|e| AppError::new(CODE_ERROR, format!("[projects] 创建 sources 目录失败: {e}")))?;
+
+    // 封面：cover_src 优先级 > remove_cover > 保留
+    let cover_rel: Option<String> = if let Some(src) = normalize_optional(input.cover_src) {
+        let src_path = Path::new(&src);
+        if !src_path.exists() {
+            return Err(AppError::new(CODE_ERROR, "[projects] 封面文件不存在"));
+        }
+        if !src_path.is_file() {
+            return Err(AppError::new(CODE_ERROR, "[projects] 封面不是文件"));
+        }
+        let ext = src_path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_ascii_lowercase())
+            .unwrap_or_else(|| "jpg".to_string());
+        let allowed = ["png", "jpg", "jpeg", "webp", "gif", "bmp"];
+        if !allowed.contains(&ext.as_str()) {
+            return Err(AppError::new(CODE_ERROR, "[projects] 封面仅支持图片格式"));
+        }
+        // 先清理旧封面（不同扩展残留）
+        remove_existing_covers(&sources_dir);
+        let dest_name = format!("{COVER_PREFIX}.{ext}");
+        let dest = sources_dir.join(&dest_name);
+        fs::copy(src_path, &dest).map_err(|e| AppError::new(CODE_ERROR, format!("[projects] 复制封面失败: {e}")))?;
+        Some(format!("{SOURCES_DIR}/{dest_name}"))
+    } else if input.remove_cover.unwrap_or(false) {
+        remove_existing_covers(&sources_dir);
+        None
+    } else {
+        existing.cover.clone()
+    };
+
+    // 正文：content_src 优先级 > remove_content > 保留
+    let content_rel: Option<String> = if let Some(src) = normalize_optional(input.content_src) {
+        let src_path = Path::new(&src);
+        if !src_path.exists() {
+            return Err(AppError::new(CODE_ERROR, "[projects] 正文文件不存在"));
+        }
+        if !src_path.is_file() {
+            return Err(AppError::new(CODE_ERROR, "[projects] 正文不是文件"));
+        }
+        if let Some(ext) = src_path.extension().and_then(|e| e.to_str()) {
+            if !ext.eq_ignore_ascii_case("txt") {
+                return Err(AppError::new(CODE_ERROR, "[projects] 正文仅支持 txt 格式"));
+            }
+        }
+        let dest = sources_dir.join(CONTENT_NAME);
+        fs::copy(src_path, &dest).map_err(|e| AppError::new(CODE_ERROR, format!("[projects] 复制正文失败: {e}")))?;
+        Some(format!("{SOURCES_DIR}/{CONTENT_NAME}"))
+    } else if input.remove_content.unwrap_or(false) {
+        let dest = sources_dir.join(CONTENT_NAME);
+        if dest.exists() {
+            let _ = fs::remove_file(&dest);
+        }
+        None
+    } else {
+        existing.content.clone()
+    };
+
+    let now = Utc::now();
+    let now_rfc = now.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+    let now_ms = now.timestamp_millis();
+
+    let metadata = ProjectMetadata {
+        identifier: existing.identifier.clone(),
+        title,
+        language,
+        creator: normalize_optional(input.creator),
+        contributor: normalize_optional(input.contributor),
+        publisher: normalize_optional(input.publisher),
+        date: normalize_optional(input.date),
+        subjects,
+        description,
+        rights: normalize_optional(input.rights),
+        source: normalize_optional(input.source),
+        relation: normalize_optional(input.relation),
+        coverage: normalize_optional(input.coverage),
+        created: existing.created.clone(),
+        modified: now_rfc,
+        modified_ms: now_ms,
+        cover: cover_rel,
+        content: content_rel,
+    };
+
+    let json = serde_json::to_string_pretty(&metadata)
+        .map_err(|e| AppError::new(CODE_ERROR, format!("[projects] 序列化失败: {e}")))?;
+    fs::write(&meta_path, json).map_err(|e| AppError::new(CODE_ERROR, format!("[projects] 写入 metadata.json 失败: {e}")))?;
+    log::info!("[projects] updated {}", existing.identifier);
     Ok(metadata)
 }
 

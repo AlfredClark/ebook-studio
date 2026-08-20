@@ -4,7 +4,7 @@ use tauri::AppHandle;
 
 use crate::{
     cores::response::Response,
-    features::projects::{self, CreateProjectInput, ProjectMetadata},
+    features::projects::{self, CreateProjectInput, ProjectMetadata, UpdateProjectInput},
 };
 
 /// 列出全部项目
@@ -15,10 +15,17 @@ pub fn list_projects(app: AppHandle) -> Response<Vec<ProjectMetadata>> {
 }
 
 /// 创建项目
-/// 前端调用：`invokeCommand<Project>("create_project", { title, language, creator, ... })`
+/// 前端调用：`invokeCommand<Project>("create_project", { payload })`
 #[tauri::command]
 pub fn create_project(app: AppHandle, payload: CreateProjectInput) -> Response<ProjectMetadata> {
     projects::create_project(&app, payload).into()
+}
+
+/// 更新项目
+/// 前端调用：`invokeCommand<Project>("update_project", { payload })`
+#[tauri::command]
+pub fn update_project(app: AppHandle, payload: UpdateProjectInput) -> Response<ProjectMetadata> {
+    projects::update_project(&app, payload).into()
 }
 
 /// 删除单个项目（整目录）

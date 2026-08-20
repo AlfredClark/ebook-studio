@@ -5,7 +5,10 @@
   import { resolve } from "$app/paths";
   import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
   import ChevronUpIcon from "@lucide/svelte/icons/chevron-up";
+  import EyeIcon from "@lucide/svelte/icons/eye";
+  import PencilIcon from "@lucide/svelte/icons/pencil";
   import PlusIcon from "@lucide/svelte/icons/plus";
+  import { Badge } from "$components/ui/badge";
   import { Button } from "$components/ui/button";
   import { Checkbox } from "$components/ui/checkbox";
   import { Input } from "$components/ui/input";
@@ -14,6 +17,7 @@
   import { Select, SelectContent, SelectItem, SelectTrigger } from "$components/ui/select";
   import { Skeleton } from "$components/ui/skeleton";
   import ConfirmDialog from "$components/widgets/overlay/ConfirmDialog.svelte";
+  import TooltipButton from "$components/widgets/overlay/TooltipButton.svelte";
   import { m } from "$libs/i18n/paraglide/messages";
   import { toast } from "$libs/overlay";
   import { batchDeleteProjects, deleteProject, listProjects, resolveProjectAsset } from "$features/projects";
@@ -146,6 +150,17 @@
     void goto(resolve("/projects/create"));
   }
 
+  function handleEdit() {
+    if (!selected) return;
+    const raw = selected.identifier;
+    const uuid = raw.startsWith("urn:uuid:") ? raw.slice("urn:uuid:".length) : raw;
+    void goto(resolve(`/projects/edit/${uuid}`));
+  }
+
+  function handleOpen() {
+    // 占位：打开功能暂不实现
+  }
+
   async function handleDelete() {
     if (!selected) return;
     const id = selected.identifier;
@@ -257,7 +272,7 @@
             {:else}
               {#each filteredSorted as project (project.identifier)}
                 <div
-                  class="flex items-center gap-2 rounded-md px-2 py-1 transition-colors hover:bg-accent {selectedId ===
+                  class="flex items-center gap-1.5 rounded-md px-2 py-1.5 transition-colors hover:bg-accent {selectedId ===
                   project.identifier
                     ? 'bg-accent text-accent-foreground'
                     : 'text-foreground'}"
@@ -269,11 +284,28 @@
                   <button
                     type="button"
                     onclick={() => handleSelect(project.identifier)}
-                    class="flex min-w-0 flex-1 items-center justify-between gap-3 text-left text-sm"
+                    class="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden text-left text-sm"
                   >
-                    <span class="min-w-0 flex-1 truncate font-medium">{project.title}</span>
-                    <span class="shrink-0 text-xs text-muted-foreground">{project.language}</span>
+                    <span class="shrink-0 truncate font-medium">{project.title}</span>
+                    {#if project.creator}
+                      <span class="shrink-0 truncate text-xs text-muted-foreground">· {project.creator}</span>
+                    {/if}
+                    {#each project.subjects.slice(0, 2) as tag (tag)}
+                      <Badge variant="secondary" class="hidden max-w-20 shrink-0 truncate sm:inline-flex">{tag}</Badge>
+                    {/each}
+                    {#if project.subjects.length > 2}
+                      <Badge variant="outline" class="hidden shrink-0 sm:inline-flex">+{project.subjects.length - 2}</Badge>
+                    {/if}
                   </button>
+                  <TooltipButton
+                    label={m.projects_open()}
+                    variant="ghost"
+                    size="icon"
+                    class="size-7 shrink-0"
+                    onclick={handleOpen}
+                  >
+                    <EyeIcon class="size-4" />
+                  </TooltipButton>
                 </div>
               {/each}
             {/if}
@@ -445,7 +477,11 @@
             </div>
           </ScrollArea>
 
-          <div class="shrink-0 border-t bg-card p-4">
+          <div class="grid shrink-0 grid-cols-2 gap-3 border-t bg-card p-4">
+            <Button variant="outline" class="w-full gap-1.5" onclick={handleEdit}>
+              <PencilIcon class="size-4" />
+              {m.projects_edit()}
+            </Button>
             <ConfirmDialog
               title={m.projects_delete_confirm_title()}
               message={m.projects_delete_confirm_message({ name: selected.title })}

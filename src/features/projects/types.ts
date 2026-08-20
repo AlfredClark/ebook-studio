@@ -57,5 +57,15 @@ export interface CreateProjectInput {
   contentSrc?: string | null;
 }
 
+/** 更新项目输入（与 CreateProjectInput 同构，增加 identifier 与移除标记） */
+export interface UpdateProjectInput extends CreateProjectInput {
+  /** 标识符 `urn:uuid:<uuid>` */
+  identifier: string;
+  /** 是否移除现有封面（coverSrc 为空时生效） */
+  removeCover?: boolean;
+  /** 是否移除现有正文 */
+  removeContent?: boolean;
+}
+
 /** 排序键（默认最新修改优先） */
 export type ProjectSortKey = "modifiedDesc" | "modifiedAsc";
