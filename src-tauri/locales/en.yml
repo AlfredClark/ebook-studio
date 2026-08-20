@@ -5,5 +5,6 @@ tray:
 menu:
   navigate: "Navigate"
   home: "Home"
+  projects: "Projects"
   settings: "Settings"
   about: "About"

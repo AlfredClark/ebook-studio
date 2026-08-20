@@ -22,3 +22,14 @@ export const defaultNavItems: NavItem[] = [
   { label: m.nav_settings, href: "/settings", icon: Settings },
   { label: m.nav_about, href: "/about", icon: Info },
 ];
+
+/** 根据当前 pathname 匹配最长前缀的导航项（用于 /projects/create 仍高亮 Projects） */
+export function getActiveNavItem(pathname: string, items: NavItem[] = defaultNavItems): NavItem | undefined {
+  const sorted = [...items].sort((a, b) => b.href.length - a.href.length);
+  return (
+    sorted.find((item) => {
+      if (item.href === "/") return pathname === "/";
+      return pathname === item.href || pathname.startsWith(`${item.href}/`);
+    }) ?? items[0]
+  );
+}

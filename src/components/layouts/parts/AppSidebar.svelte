@@ -5,7 +5,7 @@
   import * as Sidebar from "$components/ui/sidebar";
   import { m } from "$libs/i18n/paraglide/messages";
   import { getAppAuthor } from "$libs/utils";
-  import { defaultNavItems, type NavItem } from "./nav-items";
+  import { defaultNavItems, getActiveNavItem, type NavItem } from "./nav-items";
 
   // 版权年份取运行期当前年，不硬编码
   const currentYear = new Date().getFullYear();
@@ -13,9 +13,8 @@
 
   // 选中态与路由绑定：后退/刷新/直接访问均自动同步；
   // 路径与导航项不匹配时（如 tauri://localhost 无路径段、pathname 为空）回退默认项（首页）
-  const activeHref = $derived(
-    defaultNavItems.find((item) => item.href === page.url.pathname)?.href ?? defaultNavItems[0]?.href,
-  );
+  // 前缀匹配使 /projects/create 仍高亮 Projects
+  const activeHref = $derived(getActiveNavItem(page.url.pathname)?.href ?? defaultNavItems[0]?.href);
 
   async function handleNavigate(item: NavItem) {
     if (item.href !== page.url.pathname) {

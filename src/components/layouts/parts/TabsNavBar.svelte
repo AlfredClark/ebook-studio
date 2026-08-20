@@ -3,14 +3,15 @@
   import { goto } from "$app/navigation";
   import { resolve } from "$app/paths";
   import { Tabs, TabsList, TabsTrigger } from "$components/ui/tabs";
-  import { defaultNavItems, type NavItem } from "./nav-items";
+  import { defaultNavItems, getActiveNavItem, type NavItem } from "./nav-items";
 
   /** 导航项：默认使用同目录 nav-items 的 defaultNavItems，布局可传入自定义导航 */
   let { items = defaultNavItems }: { items?: NavItem[] } = $props();
 
   // 选中态与路由绑定：value 即 href，后退/刷新/直接访问均自动同步；
   // 路径与导航项不匹配时（如 tauri://localhost 无路径段、pathname 为空）回退默认项（首页）
-  let activeTab = $derived(items.find((item) => item.href === page.url.pathname)?.href ?? items[0]?.href);
+  // 前缀匹配使 /projects/create 仍高亮 Projects
+  let activeTab = $derived(getActiveNavItem(page.url.pathname, items)?.href ?? items[0]?.href);
 
   async function handleValueChange(value: string | undefined) {
     const target = items.find((item) => item.href === value);

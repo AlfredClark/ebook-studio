@@ -21,6 +21,8 @@ use crate::cores::events::{MenuPage, emit_menu_navigate};
 /// 导航菜单项 id
 const MENU_HOME: &str = "menu-home";
 /// 导航菜单项 id
+const MENU_PROJECTS: &str = "menu-projects";
+/// 导航菜单项 id
 const MENU_SETTINGS: &str = "menu-settings";
 /// 导航菜单项 id
 const MENU_ABOUT: &str = "menu-about";
@@ -45,11 +47,13 @@ fn build_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<tau
         .build()?;
 
     let home = MenuItem::with_id(app, MENU_HOME, t!("menu.home"), true, Some("Cmd+1"))?;
-    let settings = MenuItem::with_id(app, MENU_SETTINGS, t!("menu.settings"), true, Some("Cmd+2"))?;
-    let about = MenuItem::with_id(app, MENU_ABOUT, t!("menu.about"), true, Some("Cmd+3"))?;
+    let projects = MenuItem::with_id(app, MENU_PROJECTS, t!("menu.projects"), true, Some("Cmd+2"))?;
+    let settings = MenuItem::with_id(app, MENU_SETTINGS, t!("menu.settings"), true, Some("Cmd+3"))?;
+    let about = MenuItem::with_id(app, MENU_ABOUT, t!("menu.about"), true, Some("Cmd+4"))?;
 
     let navigate_menu = SubmenuBuilder::new(app, t!("menu.navigate"))
         .item(&home)
+        .item(&projects)
         .item(&settings)
         .item(&about)
         .build()?;
@@ -69,6 +73,7 @@ fn register_events<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     app.on_menu_event(|app, event| {
         let page = match event.id().as_ref() {
             MENU_HOME => Some(MenuPage::Home),
+            MENU_PROJECTS => Some(MenuPage::Projects),
             MENU_SETTINGS => Some(MenuPage::Settings),
             MENU_ABOUT => Some(MenuPage::About),
             _ => None,
