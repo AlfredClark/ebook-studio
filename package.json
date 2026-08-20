@@ -110,6 +110,7 @@
     "jiti": "^2.7.0",
     "lint-staged": "^17.3.0",
     "mode-watcher": "^1.1.0",
+    "paneforge": "^1.0.2",
     "postcss-html": "^2.0.0",
     "prettier": "^3.9.6",
     "prettier-plugin-svelte": "^4.1.1",

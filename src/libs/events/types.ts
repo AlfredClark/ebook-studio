@@ -7,4 +7,4 @@ export const EVENT_MENU_NAVIGATE = "menu:navigate";
 export const EVENT_REQUEST_EXIT = "app:request-exit";
 
 /** 菜单导航页面标识（与后端 MenuPage 枚举 serde lowercase 序列化对齐） */
-export type MenuPage = "home" | "settings" | "about";
+export type MenuPage = "home" | "clean" | "settings" | "about";

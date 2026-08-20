@@ -31,6 +31,7 @@
 │   │   │   └── parts/              # 布局骨架部件（TabsNavBar 导航条 + WindowControl 窗口控制 + nav-items 导航数据）
 │   │   ├── pages/                  # 页面级组件（与 routes/(main)/ 页面一一对应）
 │   │   │   ├── about/              # 关于页组件（AppAbout / SystemAbout）
+│   │   │   ├── clean/              # 清洗页组件（CleanPage，Resizable 左右分栏）
 │   │   │   └── settings/           # 设置页组件（Appearance / SystemSettings）
 │   │   ├── ui/                     # shadcn-svelte 生成组件（仅经 CLI 添加，components.json 管理）
 │   │   └── widgets/                # 通用小组件（自包含、可插拔，按功能分子目录）

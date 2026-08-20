@@ -27,6 +27,8 @@ pub const EVENT_REQUEST_EXIT: &str = "app:request-exit";
 pub enum MenuPage {
     /// 首页
     Home,
+    /// 清洗页
+    Clean,
     /// 设置页
     Settings,
     /// 关于页
