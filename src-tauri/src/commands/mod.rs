@@ -1,7 +1,9 @@
+pub mod clean;
 pub mod config;
 pub mod env;
 pub mod inspect;
 pub mod projects;
+pub mod split;
 
 /// 汇总所有需要暴露给前端的 IPC 命令：lib.rs 的 invoke_handler 只需调用一次本宏。
 /// 新增命令后在此列表追加，lib.rs 无需改动。
@@ -29,6 +31,10 @@ macro_rules! invoke_handlers {
             $crate::commands::inspect::inspect_content,
             $crate::commands::inspect::reorder_chapters,
             $crate::commands::inspect::get_content_path,
+            $crate::commands::split::get_split_content,
+            $crate::commands::split::split_content,
+            $crate::commands::split::save_split_chapter,
+            $crate::commands::clean::filter_clean,
         ]
     };
 }

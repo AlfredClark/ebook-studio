@@ -9,7 +9,7 @@
   import WrenchIcon from "@lucide/svelte/icons/wrench";
   import { Badge } from "$components/ui/badge";
   import { Button } from "$components/ui/button";
-  import { Card, CardContent, CardHeader, CardTitle } from "$components/ui/card";
+  import { Card, CardContent } from "$components/ui/card";
   import { Input } from "$components/ui/input";
   import { Label } from "$components/ui/label";
   import * as Resizable from "$components/ui/resizable";
@@ -198,16 +198,6 @@
       }
     }
   }
-
-  function formatDate(v: string | number) {
-    try {
-      const d = new Date(v);
-      if (isNaN(d.getTime())) return String(v);
-      return d.toLocaleString();
-    } catch {
-      return String(v);
-    }
-  }
 </script>
 
 {#if loadingProject}
@@ -224,7 +214,7 @@
   </div>
 {:else if !hasResult}
   <!-- 初始：居中显示封面+信息+结构选择+检查按钮 -->
-  <div class="flex flex-1 flex-col items-center justify-start overflow-auto p-6">
+  <div class="flex flex-1 flex-col items-center justify-center overflow-auto p-6">
     <div class="flex w-full max-w-xl flex-col items-center gap-6">
       <div class="flex flex-col items-center gap-3">
         {#if coverSrc}
@@ -241,40 +231,6 @@
           <p class="text-sm text-muted-foreground">{project.creator}</p>
         {/if}
       </div>
-
-      <Card class="w-full">
-        <CardHeader class="pb-3">
-          <CardTitle class="text-sm">{m.inspect_title()}</CardTitle>
-        </CardHeader>
-        <CardContent class="space-y-3 text-sm">
-          <div class="flex justify-between">
-            <span class="text-muted-foreground">{m.projects_detail_title()}</span>
-            <span class="font-medium">{project?.title}</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-muted-foreground">{m.projects_detail_language()}</span>
-            <span class="font-medium">{project?.language}</span>
-          </div>
-          {#if project?.creator}
-            <div class="flex justify-between">
-              <span class="text-muted-foreground">{m.projects_detail_creator()}</span>
-              <span class="font-medium">{project.creator}</span>
-            </div>
-          {/if}
-          <div class="flex justify-between">
-            <span class="text-muted-foreground">{m.projects_detail_modified()}</span>
-            <span class="font-medium tabular-nums">{project ? formatDate(project.modified) : ""}</span>
-          </div>
-          {#if project?.content}
-            <div class="flex justify-between">
-              <span class="text-muted-foreground">{m.projects_detail_content()}</span>
-              <span class="max-w-48 truncate text-xs break-all" title={project.content}>{project.content}</span>
-            </div>
-          {:else}
-            <p class="text-xs text-amber-600 dark:text-amber-400">{m.inspect_no_content()}</p>
-          {/if}
-        </CardContent>
-      </Card>
 
       <div class="flex w-full flex-col gap-3">
         <div class="flex items-center gap-2">
@@ -319,7 +275,7 @@
   <Resizable.PaneGroup direction="horizontal" class="h-full min-h-0 w-full flex-1">
     <Resizable.Pane defaultSize={38} minSize={30} maxSize={45} class="flex min-h-0 flex-col overflow-hidden border-r">
       <ScrollArea class="h-full min-h-0 flex-1">
-        <div class="flex flex-col items-center gap-4 p-6">
+        <div class="flex h-full flex-col items-center justify-center gap-4 p-6">
           {#if coverSrc}
             <img src={coverSrc} alt="cover" class="aspect-3/4 w-40 rounded-lg border object-cover shadow-sm" />
           {:else}
@@ -335,28 +291,6 @@
               <p class="text-xs text-muted-foreground">{project.creator}</p>
             {/if}
           </div>
-          <Card class="w-full">
-            <CardContent class="space-y-2 p-4 text-xs">
-              <div class="flex justify-between">
-                <span class="text-muted-foreground">{m.projects_detail_title()}</span>
-                <span class="max-w-32 truncate text-right font-medium">{project?.title}</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-muted-foreground">{m.projects_detail_language()}</span>
-                <span class="font-medium">{project?.language}</span>
-              </div>
-              {#if project?.creator}
-                <div class="flex justify-between">
-                  <span class="text-muted-foreground">{m.projects_detail_creator()}</span>
-                  <span class="font-medium">{project.creator}</span>
-                </div>
-              {/if}
-              <div class="flex justify-between">
-                <span class="text-muted-foreground">{m.projects_detail_modified()}</span>
-                <span class="font-medium tabular-nums">{project ? formatDate(project.modified) : ""}</span>
-              </div>
-            </CardContent>
-          </Card>
           <div class="flex w-full flex-col gap-2">
             <div class="flex items-center gap-2">
               <Select

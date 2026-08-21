@@ -4,5 +4,7 @@
 //! 本模块仅承载业务逻辑（返回 `AppResult<T>`），不直接构造 `Response`；
 //! 系统级能力（配置、日志、i18n 等）复用 `cores/` 的公开接口，不重写。
 
+pub mod clean;
 pub mod inspect;
 pub mod projects;
+pub mod split;
