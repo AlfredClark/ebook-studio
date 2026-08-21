@@ -64,7 +64,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVDQjk1RjM3MTJFN0JDNTYKUldSV3ZPY1NOMSs1N04wdjh3aFVGbGVVakw5RCtiZ3VDS1hNK2thK0dkUXRFTUpYam1LS2JuRGUK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDhGMjMyRjA2N0NBQkMzNQpSV1Exdk1wbjhETHlDT0dkeHQvenFnd2xqTXJHNlBkRGpPREtQWkNQc1p6WTJJYUJRQzUrNUhxawo=",
       "endpoints": ["https://github.com/AlfredClark/ebook-studio/releases/latest/download/latest.json"],
       "windows": {
         "installMode": "passive"
