@@ -67,3 +67,15 @@ pub fn get_build_path(app: AppHandle, identifier: String) -> Response<Option<Str
 pub fn get_format(app: AppHandle, identifier: String) -> Response<Option<FormatConfig>> {
     build_feat::get_format(&app, &identifier).into()
 }
+
+/// 整目录一键格式化（xhtml/opf/xml/css，2 空格缩进，失败不落盘）
+/// 前端调用：`invokeCommand<FormatBuildResult>("format_build_all", { identifier })`
+#[tauri::command]
+pub async fn format_build_all(app: AppHandle, identifier: String) -> Response<crate::features::build::FormatBuildResult> {
+    let app_clone = app.clone();
+    let res = tauri::async_runtime::spawn_blocking(move || build_feat::format_build_all(&app_clone, &identifier)).await;
+    match res {
+        Ok(inner) => inner.into(),
+        Err(e) => Response::err(crate::cores::response::CODE_ERROR, format!("[build] 格式化任务失败: {e}")),
+    }
+}

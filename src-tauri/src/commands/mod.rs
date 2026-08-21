@@ -44,6 +44,7 @@ macro_rules! invoke_handlers {
             $crate::commands::build::write_build_file,
             $crate::commands::build::get_build_path,
             $crate::commands::build::get_format,
+            $crate::commands::build::format_build_all,
             $crate::commands::package::get_package,
             $crate::commands::package::package_epub,
             $crate::commands::package::verify_package,

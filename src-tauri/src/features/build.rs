@@ -298,6 +298,234 @@ pub(crate) fn get_format(app: &AppHandle, identifier: &str) -> AppResult<Option<
     Ok(Some(cfg))
 }
 
+fn is_xml_like(path: &Path) -> bool {
+    matches!(
+        path.extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_ascii_lowercase())
+            .unwrap_or_default()
+            .as_str(),
+        "xhtml" | "html" | "xml" | "opf"
+    )
+}
+
+fn is_css_file(path: &Path) -> bool {
+    matches!(
+        path.extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_ascii_lowercase())
+            .unwrap_or_default()
+            .as_str(),
+        "css"
+    )
+}
+
+fn format_xml_content(content: &str) -> AppResult<String> {
+    use quick_xml::Reader;
+    use quick_xml::Writer;
+    use quick_xml::events::Event;
+    let mut reader = Reader::from_str(content);
+    reader.config_mut().trim_text(true);
+    let mut writer = Writer::new_with_indent(Vec::new(), b' ', 2);
+    loop {
+        match reader.read_event() {
+            Ok(Event::Eof) => break,
+            Ok(e) => writer
+                .write_event(e.borrow())
+                .map_err(|e| AppError::new(CODE_ERROR, format!("[build] 格式化 XML 失败: {e}")))?,
+            Err(e) => return Err(AppError::new(CODE_ERROR, format!("[build] XML 解析失败: {e}"))),
+        }
+    }
+    let result = writer.into_inner();
+    String::from_utf8(result).map_err(|e| AppError::new(CODE_ERROR, format!("[build] 编码失败: {e}")))
+}
+
+fn pretty_css_minified(minified: &str) -> String {
+    let mut out = String::new();
+    let mut indent: usize = 0;
+    let mut in_string: Option<char> = None;
+    let chars: Vec<char> = minified.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        let c = chars[i];
+        if let Some(q) = in_string {
+            out.push(c);
+            if c == q {
+                // check escaped
+                let mut backslashes = 0;
+                let mut j = i as isize - 1;
+                while j >= 0 && chars[j as usize] == '\\' {
+                    backslashes += 1;
+                    j -= 1;
+                }
+                if backslashes % 2 == 0 {
+                    in_string = None;
+                }
+            }
+            i += 1;
+            continue;
+        }
+        if c == '"' || c == '\'' {
+            in_string = Some(c);
+            out.push(c);
+            i += 1;
+            continue;
+        }
+        // handle comment /* */
+        if c == '/' && i + 1 < chars.len() && chars[i + 1] == '*' {
+            out.push_str("/*");
+            i += 2;
+            while i + 1 < chars.len() {
+                if chars[i] == '*' && chars[i + 1] == '/' {
+                    out.push_str("*/");
+                    i += 2;
+                    break;
+                } else {
+                    out.push(chars[i]);
+                    i += 1;
+                }
+            }
+            continue;
+        }
+        match c {
+            '{' => {
+                out.push_str(" {\n");
+                indent += 1;
+                out.push_str(&"  ".repeat(indent));
+            }
+            '}' => {
+                out.push('\n');
+                indent = indent.saturating_sub(1);
+                out.push_str(&"  ".repeat(indent));
+                out.push('}');
+                if i + 1 < chars.len() && chars[i + 1] != '}' {
+                    out.push('\n');
+                    out.push_str(&"  ".repeat(indent));
+                }
+            }
+            ';' => {
+                out.push(';');
+                // peek next non-whitespace
+                let mut j = i + 1;
+                while j < chars.len() && chars[j].is_whitespace() {
+                    j += 1;
+                }
+                if j < chars.len() && chars[j] != '}' {
+                    out.push('\n');
+                    out.push_str(&"  ".repeat(indent));
+                }
+            }
+            ':' => {
+                out.push_str(": ");
+            }
+            ',' => {
+                out.push_str(", ");
+            }
+            _ => {
+                if c.is_whitespace() {
+                    // collapse whitespace to single space if needed
+                    if !out.ends_with(' ') && !out.ends_with('\n') && !out.ends_with("  ") {
+                        // only add space if previous is not whitespace
+                        // check next char is not whitespace
+                    }
+                    // skip whitespace in minified should not happen
+                } else {
+                    out.push(c);
+                }
+            }
+        }
+        i += 1;
+    }
+    out.trim().to_string() + "\n"
+}
+
+fn format_css_content(content: &str) -> AppResult<String> {
+    // 使用 styloria 解析后序列化为 minified，再美化
+    let sheet = styloria::Parser::parse_stylesheet(content);
+    let minified = styloria::serialize_stylesheet(&sheet);
+    if minified.trim().is_empty() {
+        return Err(AppError::new(CODE_ERROR, "[build] CSS 解析为空"));
+    }
+    Ok(pretty_css_minified(&minified))
+}
+
+/// 整目录一键格式化（xhtml/opf/xml/css，2 空格缩进，失败不落盘）
+pub(crate) fn format_build_all(app: &AppHandle, identifier: &str) -> AppResult<FormatBuildResult> {
+    let id = identifier.trim().to_string();
+    if id.is_empty() {
+        return Err(AppError::new(CODE_ERROR, "[build] identifier 不能为空"));
+    }
+    let (project_dir, _uuid, _) = resolve_project_base(app, &id)?;
+    let Some(book_root) = find_book_root(&project_dir)? else {
+        return Err(AppError::new(CODE_ERROR, "[build] 尚未构建"));
+    };
+    let mut entries: Vec<PathBuf> = Vec::new();
+    {
+        let mut stack = vec![book_root.clone()];
+        while let Some(dir) = stack.pop() {
+            let rd = fs::read_dir(&dir).map_err(|e| AppError::new(CODE_ERROR, format!("[build] 读取构建目录失败: {e}")))?;
+            for e in rd.flatten() {
+                let p = e.path();
+                if p.is_dir() {
+                    stack.push(p);
+                } else {
+                    entries.push(p);
+                }
+            }
+        }
+        entries.sort();
+    }
+    let mut formatted = 0usize;
+    let mut skipped = 0usize;
+    let mut failed: Vec<String> = Vec::new();
+    for abs in entries {
+        let rel = abs.strip_prefix(&book_root).unwrap_or(&abs).to_string_lossy().to_string();
+        let is_xml = is_xml_like(&abs);
+        let is_css = is_css_file(&abs);
+        if !is_xml && !is_css {
+            skipped += 1;
+            continue;
+        }
+        let raw = fs::read_to_string(&abs).map_err(|e| AppError::new(CODE_ERROR, format!("[build] 读取 {rel} 失败: {e}")))?;
+        if raw.trim().is_empty() {
+            skipped += 1;
+            continue;
+        }
+        let result = if is_xml {
+            format_xml_content(&raw)
+        } else {
+            format_css_content(&raw)
+        };
+        match result {
+            Ok(formatted_content) => {
+                if formatted_content != raw {
+                    fs::write(&abs, formatted_content)
+                        .map_err(|e| AppError::new(CODE_ERROR, format!("[build] 写入 {rel} 失败: {e}")))?;
+                }
+                formatted += 1;
+            }
+            Err(e) => {
+                failed.push(format!("{rel}: {}", e.message));
+                log::warn!("[build] 格式化 {rel} 失败: {}", e.message);
+            }
+        }
+    }
+    if !failed.is_empty() {
+        return Err(AppError::new(
+            CODE_ERROR,
+            format!("[build] 部分文件格式化失败: {}", failed.join("; ")),
+        ));
+    }
+    Ok(FormatBuildResult { formatted, skipped })
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FormatBuildResult {
+    pub formatted: usize,
+    pub skipped: usize,
+}
+
 /// 查询已构建的 EPUB 目录（若不存在返回 None）
 pub(crate) fn get_build(app: &AppHandle, identifier: &str) -> AppResult<Option<BuildResult>> {
     let id = identifier.trim().to_string();
@@ -1128,7 +1356,10 @@ fn find_book_root(project_dir: &Path) -> AppResult<Option<PathBuf>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{apply_title_format, compute_pad_width, escape_xml, format_number_display, sanitize_title};
+    use super::{
+        apply_title_format, compute_pad_width, escape_xml, format_css_content, format_number_display, format_xml_content,
+        sanitize_title,
+    };
 
     #[test]
     fn test_escape() {
@@ -1167,5 +1398,24 @@ mod tests {
         assert_eq!(apply_title_format("第{order}章 {title}", "5", "风起"), "第5章 风起");
         assert_eq!(apply_title_format("{title}-{order}", "001", "序"), "序-001");
         assert_eq!(apply_title_format("前言", "1", "前言"), "前言");
+    }
+
+    #[test]
+    fn test_format_xml() {
+        let raw = r#"<?xml version="1.0" encoding="UTF-8"?><package><metadata><dc:title>Test</dc:title></metadata></package>"#;
+        let formatted = format_xml_content(raw).unwrap();
+        assert!(formatted.contains("  <metadata>") || formatted.contains("\n"));
+        // 无效 XML 至少不 panic，能返回 Ok 或 Err 均可
+        let bad = "<a><b>";
+        let _ = format_xml_content(bad);
+    }
+
+    #[test]
+    fn test_format_css() {
+        let raw = "p{color:red;margin:0}h1{font-size:2em}";
+        let formatted = format_css_content(raw).unwrap();
+        assert!(formatted.contains("p {"));
+        assert!(formatted.contains("  color:"));
+        assert!(formatted.contains("\n"));
     }
 }

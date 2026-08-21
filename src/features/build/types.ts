@@ -28,3 +28,8 @@ export interface FormatConfig {
   volumeTitleFormat: string;
   numberFormat: NumberFormat;
 }
+
+export interface FormatBuildResult {
+  formatted: number;
+  skipped: number;
+}

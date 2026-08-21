@@ -13,6 +13,7 @@
   import RotateCcwIcon from "@lucide/svelte/icons/rotate-ccw";
   import SaveIcon from "@lucide/svelte/icons/save";
   import SearchIcon from "@lucide/svelte/icons/search";
+  import WandIcon from "@lucide/svelte/icons/wand";
   import { Button } from "$components/ui/button";
   import { Input } from "$components/ui/input";
   import { Label } from "$components/ui/label";
@@ -27,7 +28,16 @@
   import { getProject } from "$features/projects";
   import type { Project } from "$features/projects";
   import { getSplitContent } from "$features/split";
-  import { getBuild, buildEpub, removeBuild, readBuildFile, writeBuildFile, getBuildPath, getFormat } from "$features/build";
+  import {
+    getBuild,
+    buildEpub,
+    removeBuild,
+    readBuildFile,
+    writeBuildFile,
+    getBuildPath,
+    getFormat,
+    formatBuildAll,
+  } from "$features/build";
   import type { BuildFile, BuildResult, NumberFormat } from "$features/build";
   import { revealItemInDir } from "@tauri-apps/plugin-opener";
 
@@ -46,6 +56,7 @@
   let pending = $state(false);
   let saving = $state(false);
   let removing = $state(false);
+  let formatting = $state(false);
 
   let search = $state("");
   let collapsedDirs = new SvelteSet<string>();
@@ -242,6 +253,41 @@
     }
   }
 
+  async function handleFormatAll() {
+    if (!identifier) return;
+    formatting = true;
+    try {
+      const res = await formatBuildAll(identifier);
+      if (res) {
+        toast.success(m.build_format_success({ count: res.formatted }));
+        const refreshed = await getBuild(identifier);
+        if (refreshed) buildData = refreshed;
+        if (selectedPath) {
+          const ext = selectedPath.split(".").pop()?.toLowerCase() ?? "";
+          if (["xhtml", "html", "xml", "opf", "css"].includes(ext)) {
+            try {
+              const content = await readBuildFile(identifier, selectedPath);
+              if (content !== null) {
+                // 若当前文件未被编辑，直接同步 draft；若有未保存修改则保留 draft 但更新 originalContent 使得 dirty 仍准确
+                if (!dirty) draft = content;
+                originalContent = content;
+              }
+            } catch {
+              // 忽略刷新失败
+            }
+          }
+        }
+      } else {
+        toast.error(m.build_format_failed());
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(msg || m.build_format_failed());
+    } finally {
+      formatting = false;
+    }
+  }
+
   async function handleSelectFile(path: string, isDir: boolean) {
     if (isDir) {
       if (collapsedDirs.has(path)) collapsedDirs.delete(path);
@@ -399,6 +445,16 @@
           <SearchIcon class="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input bind:value={search} placeholder={m.build_search_placeholder()} class="h-7 pl-7 text-xs" />
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          class="h-7 gap-1 text-xs"
+          onclick={handleFormatAll}
+          disabled={formatting || pending || removing}
+        >
+          <WandIcon class="size-3.5" />
+          {formatting ? m.build_formatting() : m.build_format()}
+        </Button>
         <ConfirmDialog
           title={m.build_rebuild_confirm_title()}
           message={m.build_rebuild_confirm_message()}
@@ -407,7 +463,7 @@
           onConfirm={handleRemoveBuild}
         >
           {#snippet trigger({ props })}
-            <Button variant="outline" size="sm" class="h-7 gap-1 text-xs" {...props} disabled={removing || pending}>
+            <Button variant="outline" size="sm" class="h-7 gap-1 text-xs" {...props} disabled={removing || pending || formatting}>
               <RotateCcwIcon class="size-3.5" />
               {removing ? m.build_rebuilding() : m.build_rebuild()}
             </Button>

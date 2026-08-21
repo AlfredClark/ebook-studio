@@ -49,4 +49,6 @@ tauri-plugin-updater = "2.10.1"
 tauri-plugin-window-state = "2"
 chinese-number = "0.8.2"
 epubveri = "0.9"
+quick-xml = { version = "0.41", default-features = false }
+styloria = "0.11"
 zip = { version = "4", default-features = false, features = ["deflate"] }
