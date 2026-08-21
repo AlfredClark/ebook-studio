@@ -3,6 +3,7 @@ pub mod clean;
 pub mod config;
 pub mod env;
 pub mod inspect;
+pub mod package;
 pub mod projects;
 pub mod split;
 
@@ -42,6 +43,12 @@ macro_rules! invoke_handlers {
             $crate::commands::build::read_build_file,
             $crate::commands::build::write_build_file,
             $crate::commands::build::get_build_path,
+            $crate::commands::build::get_format,
+            $crate::commands::package::get_package,
+            $crate::commands::package::package_epub,
+            $crate::commands::package::verify_package,
+            $crate::commands::package::remove_package,
+            $crate::commands::package::get_package_path,
         ]
     };
 }

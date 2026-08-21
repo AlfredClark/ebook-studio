@@ -7,5 +7,6 @@
 pub mod build;
 pub mod clean;
 pub mod inspect;
+pub mod package;
 pub mod projects;
 pub mod split;

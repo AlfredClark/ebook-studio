@@ -25,6 +25,25 @@ const BUILD_DIR: &str = "build";
 
 const DEFAULT_CHAPTER_TITLE_FORMAT: &str = "第{order}章 {title}";
 const DEFAULT_VOLUME_TITLE_FORMAT: &str = "第{order}卷 {title}";
+const FORMAT_NAME: &str = "format.json";
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FormatConfig {
+    pub chapter_title_format: String,
+    pub volume_title_format: String,
+    pub number_format: String,
+}
+
+impl Default for FormatConfig {
+    fn default() -> Self {
+        Self {
+            chapter_title_format: DEFAULT_CHAPTER_TITLE_FORMAT.to_string(),
+            volume_title_format: DEFAULT_VOLUME_TITLE_FORMAT.to_string(),
+            number_format: "arabic".to_string(),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -215,7 +234,7 @@ fn collect_build_files(root: &Path, base: &Path) -> AppResult<Vec<BuildFile>> {
     build_file_tree(root, base)
 }
 
-fn format_number_display(order: i32, number_format: &str, pad_width: usize) -> String {
+pub(crate) fn format_number_display(order: i32, number_format: &str, pad_width: usize) -> String {
     match number_format {
         "arabic" => order.to_string(),
         "arabic_padded" => format!("{order:0>width$}", width = pad_width),
@@ -238,7 +257,7 @@ fn format_number_display(order: i32, number_format: &str, pad_width: usize) -> S
     }
 }
 
-fn apply_title_format(format: &str, order_str: &str, title: &str) -> String {
+pub(crate) fn apply_title_format(format: &str, order_str: &str, title: &str) -> String {
     // 必须包含 {title}，若不含则直接返回标题；{order} 可选
     let mut out = format.to_string();
     if format.contains("{order}") {
@@ -255,8 +274,28 @@ fn apply_title_format(format: &str, order_str: &str, title: &str) -> String {
     out.trim().to_string()
 }
 
-fn compute_pad_width(count: usize) -> usize {
+pub(crate) fn compute_pad_width(count: usize) -> usize {
     count.to_string().len().max(2)
+}
+
+/// 读取已保存的格式化配置（format.json），不存在或损坏则返回 None
+pub(crate) fn get_format(app: &AppHandle, identifier: &str) -> AppResult<Option<FormatConfig>> {
+    let id = identifier.trim().to_string();
+    if id.is_empty() {
+        return Err(AppError::new(CODE_ERROR, "[build] identifier 不能为空"));
+    }
+    let (project_dir, _uuid, _) = resolve_project_base(app, &id)?;
+    let path = project_dir.join(FORMAT_NAME);
+    if !path.exists() {
+        return Ok(None);
+    }
+    let data =
+        fs::read_to_string(&path).map_err(|e| AppError::new(CODE_ERROR, format!("[build] 读取 format.json 失败: {e}")))?;
+    let cfg: FormatConfig = serde_json::from_str(&data).map_err(|e| {
+        log::warn!("[build] 解析 format.json 失败: {e}");
+        AppError::new(CODE_ERROR, format!("[build] 解析 format.json 失败: {e}"))
+    })?;
+    Ok(Some(cfg))
 }
 
 /// 查询已构建的 EPUB 目录（若不存在返回 None）
@@ -420,6 +459,17 @@ pub(crate) fn build_epub(
         _ => "arabic".to_string(),
     };
 
+    // 持久化格式化配置供 package 阶段复用
+    let fmt_cfg = FormatConfig {
+        chapter_title_format: chap_fmt.clone(),
+        volume_title_format: vol_fmt.clone(),
+        number_format: num_fmt.clone(),
+    };
+    let fmt_path = project_dir.join(FORMAT_NAME);
+    if let Err(e) = fs::write(&fmt_path, serde_json::to_string_pretty(&fmt_cfg).unwrap_or_default()) {
+        log::warn!("[build] 写入 format.json 失败: {e}");
+    }
+
     // 清理旧 build
     let build_base = project_dir.join(BUILD_DIR);
     if build_base.exists() {
@@ -504,8 +554,13 @@ pub(crate) fn build_epub(
     let modified = meta
         .get("modified")
         .and_then(|v| v.as_str())
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true));
+        .map(|s| s.trim().to_string())
+        .and_then(|s| {
+            chrono::DateTime::parse_from_rfc3339(&s)
+                .ok()
+                .map(|dt| dt.with_timezone(&Utc).to_rfc3339_opts(chrono::SecondsFormat::Secs, true))
+        })
+        .unwrap_or_else(|| Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true));
     let book_uuid = uuid.clone();
     let book_author = creator.clone().unwrap_or_else(|| "佚名".to_string());
 
@@ -721,21 +776,38 @@ pub(crate) fn build_epub(
 
     // 生成 content.opf
     let mut opf_tpl = read_template(app, "EPUB33-NOVEL/EPUB/content.opf")?;
-    // 构造 manifest/items
+    // 构造 manifest/items（与 spine/toc 同序交错，避免阅读序不一致）
     let mut manifest_items = String::new();
-    for vol in &vol_infos {
-        manifest_items.push_str(&format!(
-            r#"    <item id="{}" href="{}" media-type="application/xhtml+xml"/>"#,
-            vol.id, vol.href
-        ));
-        manifest_items.push('\n');
-    }
-    for chap in &chap_infos {
-        manifest_items.push_str(&format!(
-            r#"    <item id="{}" href="{}" media-type="application/xhtml+xml"/>"#,
-            chap.id, chap.href
-        ));
-        manifest_items.push('\n');
+    if !vol_infos.is_empty() {
+        for vol in &vol_infos {
+            manifest_items.push_str(&format!(
+                r#"    <item id="{}" href="{}" media-type="application/xhtml+xml"/>"#,
+                vol.id, vol.href
+            ));
+            manifest_items.push('\n');
+            for chap in chap_infos.iter().filter(|c| c.vol_order == Some(vol.order)) {
+                manifest_items.push_str(&format!(
+                    r#"    <item id="{}" href="{}" media-type="application/xhtml+xml"/>"#,
+                    chap.id, chap.href
+                ));
+                manifest_items.push('\n');
+            }
+        }
+        for chap in chap_infos.iter().filter(|c| c.vol_order.is_none()) {
+            manifest_items.push_str(&format!(
+                r#"    <item id="{}" href="{}" media-type="application/xhtml+xml"/>"#,
+                chap.id, chap.href
+            ));
+            manifest_items.push('\n');
+        }
+    } else {
+        for chap in &chap_infos {
+            manifest_items.push_str(&format!(
+                r#"    <item id="{}" href="{}" media-type="application/xhtml+xml"/>"#,
+                chap.id, chap.href
+            ));
+            manifest_items.push('\n');
+        }
     }
     // 去掉末尾换行
     if manifest_items.ends_with('\n') {
@@ -743,13 +815,24 @@ pub(crate) fn build_epub(
     }
 
     let mut spine_items = String::new();
-    for vol in &vol_infos {
-        spine_items.push_str(&format!(r#"    <itemref idref="{}"/>"#, vol.id));
-        spine_items.push('\n');
-    }
-    for chap in &chap_infos {
-        spine_items.push_str(&format!(r#"    <itemref idref="{}"/>"#, chap.id));
-        spine_items.push('\n');
+    if !vol_infos.is_empty() {
+        for vol in &vol_infos {
+            spine_items.push_str(&format!(r#"    <itemref idref="{}"/>"#, vol.id));
+            spine_items.push('\n');
+            for chap in chap_infos.iter().filter(|c| c.vol_order == Some(vol.order)) {
+                spine_items.push_str(&format!(r#"    <itemref idref="{}"/>"#, chap.id));
+                spine_items.push('\n');
+            }
+        }
+        for chap in chap_infos.iter().filter(|c| c.vol_order.is_none()) {
+            spine_items.push_str(&format!(r#"    <itemref idref="{}"/>"#, chap.id));
+            spine_items.push('\n');
+        }
+    } else {
+        for chap in &chap_infos {
+            spine_items.push_str(&format!(r#"    <itemref idref="{}"/>"#, chap.id));
+            spine_items.push('\n');
+        }
     }
     if spine_items.ends_with('\n') {
         spine_items.pop();
@@ -851,6 +934,13 @@ pub(crate) fn build_epub(
     landmarks.push_str(r#"      <li><a epub:type="cover" href="cover.xhtml">封面</a></li>"#);
     landmarks.push('\n');
     landmarks.push_str(r#"      <li><a epub:type="titlepage" href="titlepage.xhtml">扉页</a></li>"#);
+    if let Some(first) = chap_infos.first() {
+        landmarks.push('\n');
+        landmarks.push_str(&format!(
+            r#"      <li><a epub:type="bodymatter" href="{}">正文</a></li>"#,
+            first.href
+        ));
+    }
     // TOC: 若有卷则卷为一级，章为二级
     if !vol_infos.is_empty() {
         for vol in &vol_infos {
@@ -874,12 +964,6 @@ pub(crate) fn build_epub(
                 toc_list.push_str("        </ol>\n");
             }
             toc_list.push_str("      </li>\n");
-            landmarks.push('\n');
-            landmarks.push_str(&format!(
-                r#"      <li><a epub:type="volume" href="{}">{}</a></li>"#,
-                vol.href,
-                escape_xml(&vol.display_title)
-            ));
         }
         for chap in chap_infos.iter().filter(|c| c.vol_order.is_none()) {
             // 卷外章（纯章节遗漏）直接一级
@@ -898,12 +982,6 @@ pub(crate) fn build_epub(
                 escape_xml(&chap.display_title)
             ));
             toc_list.push('\n');
-            landmarks.push('\n');
-            landmarks.push_str(&format!(
-                r#"      <li><a epub:type="chapter" href="{}">{}</a></li>"#,
-                chap.href,
-                escape_xml(&chap.display_title)
-            ));
         }
     }
     // 去尾换行

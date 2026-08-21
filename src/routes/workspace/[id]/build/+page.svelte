@@ -27,7 +27,7 @@
   import { getProject } from "$features/projects";
   import type { Project } from "$features/projects";
   import { getSplitContent } from "$features/split";
-  import { getBuild, buildEpub, removeBuild, readBuildFile, writeBuildFile, getBuildPath } from "$features/build";
+  import { getBuild, buildEpub, removeBuild, readBuildFile, writeBuildFile, getBuildPath, getFormat } from "$features/build";
   import type { BuildFile, BuildResult, NumberFormat } from "$features/build";
   import { revealItemInDir } from "@tauri-apps/plugin-opener";
 
@@ -154,10 +154,25 @@
     }
   }
 
+  async function loadFormat() {
+    if (!identifier) return;
+    try {
+      const fmt = await getFormat(identifier);
+      if (fmt) {
+        if (fmt.chapterTitleFormat) chapterTitleFormat = fmt.chapterTitleFormat;
+        if (fmt.volumeTitleFormat) volumeTitleFormat = fmt.volumeTitleFormat;
+        if (fmt.numberFormat) numberFormat = fmt.numberFormat as NumberFormat;
+      }
+    } catch {
+      // 忽略，回退默认值
+    }
+  }
+
   onMount(() => {
     void loadProject();
     void loadSplitCheck();
     void loadBuild();
+    void loadFormat();
   });
 
   $effect(() => {
@@ -165,6 +180,7 @@
       void loadProject();
       void loadSplitCheck();
       void loadBuild();
+      void loadFormat();
     }
   });
 

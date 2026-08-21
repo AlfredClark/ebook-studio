@@ -432,7 +432,7 @@ pub(crate) fn split_content(app: &AppHandle, identifier: &str) -> AppResult<Spli
             if let Ok(data) = fs::read_to_string(&meta_path) {
                 if let Ok(mut v) = serde_json::from_str::<serde_json::Value>(&data) {
                     let now = Utc::now();
-                    let now_rfc = now.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+                    let now_rfc = now.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
                     let now_ms = now.timestamp_millis();
                     if let Some(obj) = v.as_object_mut() {
                         obj.insert("modified".to_string(), serde_json::Value::String(now_rfc));
@@ -536,7 +536,7 @@ pub(crate) fn save_split_chapter(
             if let Ok(data) = fs::read_to_string(&meta_path) {
                 if let Ok(mut v) = serde_json::from_str::<serde_json::Value>(&data) {
                     let now = Utc::now();
-                    let now_rfc = now.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+                    let now_rfc = now.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
                     let now_ms = now.timestamp_millis();
                     if let Some(obj) = v.as_object_mut() {
                         obj.insert("modified".to_string(), serde_json::Value::String(now_rfc));

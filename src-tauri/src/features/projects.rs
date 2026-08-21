@@ -276,7 +276,7 @@ pub(crate) fn create_project(app: &AppHandle, input: CreateProjectInput) -> AppR
     let uuid = Uuid::new_v4().to_string();
     let identifier = format!("urn:uuid:{uuid}");
     let now = Utc::now();
-    let now_rfc = now.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+    let now_rfc = now.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
     let now_ms = now.timestamp_millis();
 
     let base = ensure_projects_dir(app)?;
@@ -475,7 +475,7 @@ pub(crate) fn update_project(app: &AppHandle, input: UpdateProjectInput) -> AppR
     };
 
     let now = Utc::now();
-    let now_rfc = now.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+    let now_rfc = now.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
     let now_ms = now.timestamp_millis();
 
     let metadata = ProjectMetadata {

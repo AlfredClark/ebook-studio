@@ -2,7 +2,7 @@
  * 构建业务：前端直调 invokeCommand 封装后端 build 能力
  */
 import { invokeCommand } from "$libs/ipc";
-import type { BuildResult } from "./types";
+import type { BuildResult, FormatConfig } from "./types";
 
 /**
  * 查询已构建的 EPUB 目录（若不存在返回 null）
@@ -67,4 +67,11 @@ export async function writeBuildFile(identifier: string, relPath: string, conten
  */
 export async function getBuildPath(identifier: string): Promise<string | null> {
   return invokeCommand<string>("get_build_path", { identifier });
+}
+
+/**
+ * 获取已保存的格式化配置（format.json）
+ */
+export async function getFormat(identifier: string): Promise<FormatConfig | null> {
+  return invokeCommand<FormatConfig>("get_format", { identifier });
 }

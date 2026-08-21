@@ -2,7 +2,10 @@
 
 use tauri::AppHandle;
 
-use crate::{cores::response::Response, features::build::BuildResult};
+use crate::{
+    cores::response::Response,
+    features::build::{BuildResult, FormatConfig},
+};
 
 use crate::features::build as build_feat;
 
@@ -56,4 +59,11 @@ pub fn write_build_file(app: AppHandle, identifier: String, rel_path: String, co
 pub fn get_build_path(app: AppHandle, identifier: String) -> Response<Option<String>> {
     let r = build_feat::get_build(&app, &identifier).map(|opt| opt.map(|b| b.epub_path));
     r.into()
+}
+
+/// 获取已保存的格式化配置（format.json）
+/// 前端调用：`invokeCommand<FormatConfig|null>("get_format", { identifier })`
+#[tauri::command]
+pub fn get_format(app: AppHandle, identifier: String) -> Response<Option<FormatConfig>> {
+    build_feat::get_format(&app, &identifier).into()
 }

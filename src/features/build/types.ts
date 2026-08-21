@@ -22,3 +22,9 @@ export interface BuildOptions {
   volumeTitleFormat: string;
   numberFormat: NumberFormat;
 }
+
+export interface FormatConfig {
+  chapterTitleFormat: string;
+  volumeTitleFormat: string;
+  numberFormat: NumberFormat;
+}
