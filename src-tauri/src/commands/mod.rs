@@ -1,3 +1,4 @@
+pub mod build;
 pub mod clean;
 pub mod config;
 pub mod env;
@@ -35,6 +36,11 @@ macro_rules! invoke_handlers {
             $crate::commands::split::split_content,
             $crate::commands::split::save_split_chapter,
             $crate::commands::clean::filter_clean,
+            $crate::commands::build::get_build,
+            $crate::commands::build::build_epub,
+            $crate::commands::build::read_build_file,
+            $crate::commands::build::write_build_file,
+            $crate::commands::build::get_build_path,
         ]
     };
 }

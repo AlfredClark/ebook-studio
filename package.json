@@ -57,16 +57,23 @@
     "format:all:check": "prettier --check . && cargo fmt --check"
   },
   "lint-staged": {
-    "*.{js,ts,svelte}": [
-      "eslint --fix"
+    "*.{js,ts}": [
+      "eslint --fix",
+      "prettier --write --ignore-unknown"
     ],
-    "*.{css,svelte}": [
-      "stylelint --fix"
+    "*.svelte": [
+      "eslint --fix",
+      "stylelint --fix --allow-empty-input",
+      "prettier --write --ignore-unknown"
+    ],
+    "*.css": [
+      "stylelint --fix --allow-empty-input",
+      "prettier --write --ignore-unknown"
     ],
     "*.rs": [
-      "rustfmt"
+      "rustfmt --edition 2024"
     ],
-    "*": [
+    "*.{json,md,yml,yaml}": [
       "prettier --write --ignore-unknown"
     ]
   },
