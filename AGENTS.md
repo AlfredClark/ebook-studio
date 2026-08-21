@@ -84,7 +84,7 @@
 │   │   └── main.rs                 # 程序入口
 │   ├── templates/EPUB33-NOVEL/       # EPUB 3.3 模板（mimetype/META-INF/container.xml + EPUB/{content.opf,nav.xhtml,cover/titlepage,styles/base.css,text/*-template.xhtml}，经 bundle.resources 打包）
 │   ├── build.rs                    # Tauri 构建脚本
-│   └── tauri.conf.json             # Tauri 应用配置（decorations:false + dragDropEnabled，含 img-src asset: http://asset.localhost 支持封面预览 data URL/asset）
+│   └── tauri.conf.json             # Tauri 应用配置（decorations:false + dragDropEnabled，含 img-src asset: http://asset.localhost data: 支持封面预览 data URL/asset）
 ├── scripts/                        # Node 工具脚本（bump-version.mjs 版本提升）
 ├── static/                         # 前端静态资源
 ├── .editorconfig                   # 编辑器统一风格
@@ -367,7 +367,7 @@
 - **首帧性能**：SPA 白屏经「单入口打包」缓解——`svelte.config.ts` 配 `kit.output.bundleStrategy: "single"` 收敛 JS 单入口（消除 modulepreload/动态 import 请求链，JS 仍外链不受 CSP 约束）
 - **全局常量注入**：经 vite `define` 整体注入配置对象（`__APP_TAURI_CONF__` 为整份 tauri.conf.json、`__APP_PKG__` 为整份 package.json），消费方按需取属性；类型在 `src/vite-env.d.ts` 经 `import type ... from "*.json"` 引用 JSON 字面量推导（天然同步）；新增配置须同步 eslint.config.ts 的 `viteDefineGlobals`；watch 忽略 src-tauri，改配置需重启 dev 生效
 - **Tailwind v4**：经 `@tailwindcss/vite` 插件编译（vite.config.ts，无 postcss 配置）；`src/styles/app.css` 为唯一入口（`@import "tailwindcss"` + `@import "./themes/index.css"`）；**主题真相源在 `src/styles/themes`**（shadcn 语义 token，换主题只改主题文件）；Tailwind 变量映射（`@theme inline`，`--color-*` 桥接语义 token）集中在 app.css 单一真相源，主题文件只承载变量值；新增主题在 themes/ 下直接以名字命名（neutral.css、blue.css…），**经 `themes/index.css` 聚合 import + `themes/index.ts` 追加 `themeNames` + AppearanceSettings 的 label 映射（options 由 themeNames 驱动）**，运行期经 `data-theme` 切换；**主题可分完整 token 与局部覆盖两类——完整主题含全量语义 token（浅/深），局部覆盖主题基于 neutral 基底仅覆盖差异 token（如 primary/chart/sidebar），`data-theme` 未覆盖 token 回落基底值**；`@theme`/`@custom-variant`/`@apply` 等 at-rule 与 oklch 数字写法已在 stylelint 豁免（.stylelintrc.json）
-- **CSP**：bits-ui 浮层组件（popover/dropdown/tooltip）经 floating-ui 内联 style 定位，生产 csp 的 style-src 必须含 `'unsafe-inline'`（已配置，勿删）；封面预览经后端 `read_image_as_data_url` 返回 `data:` URL，不走 `asset:` 协议，`tauri.conf.json` 的 `img-src` 已含 `asset: http://asset.localhost` 兼容 `convertFileSrc` 回退
+- **CSP**：bits-ui 浮层组件（popover/dropdown/tooltip）经 floating-ui 内联 style 定位，生产 csp 的 style-src 必须含 `'unsafe-inline'`（已配置，勿删）；封面预览经后端 `read_image_as_data_url` 返回 `data:` URL，不走 `asset:` 协议，`tauri.conf.json` 的 `img-src` 已含 `asset: http://asset.localhost data:`（devCsp/csp 两侧）兼容 `convertFileSrc` 回退与 data URL——生产 csp 缺 `data:` 会导致打包后封面加载失败（`resource load failed: <img>`，dev 因不注入 CSP 不暴露），勿删
 - **主题**：深色模式为 class 策略——`document.documentElement` 挂 `.dark`（styles/app.css `@custom-variant dark`）；**暗色偏好经 mode-watcher 管理**——根布局挂 `<ModeWatcher />`（应用/移除 `.dark` + `color-scheme`），偏好经 `userPrefersMode`（`system | light | dark`，持久化于 `mode-watcher-mode` key，system 走 prefers-color-scheme），切换用 `setMode`；消费组件直接 import mode-watcher（如 sonner 的 `theme={mode.current}`）
 - **prettier**：prettier-plugin-tailwindcss 自动排序 Tailwind 类（`tailwindStylesheet` 指向 src/styles/app.css，插件顺序 svelte 在前）
 - **eslint 配置**：`.svelte.ts` runes 模块纳入 svelte 解析器块（extraFileExtensions）；`scripts/**/*.mjs` 配置 Node globals；`src/components/ui/**` 关闭 `svelte/no-navigation-without-resolve`（按钮类组件 href 为动态绑定，规则误报）
