@@ -340,113 +340,248 @@ fn format_xml_content(content: &str) -> AppResult<String> {
     String::from_utf8(result).map_err(|e| AppError::new(CODE_ERROR, format!("[build] 编码失败: {e}")))
 }
 
-fn pretty_css_minified(minified: &str) -> String {
-    let mut out = String::new();
-    let mut indent: usize = 0;
-    let mut in_string: Option<char> = None;
-    let chars: Vec<char> = minified.chars().collect();
+/// 提取区间内全部 CSS 注释（`/* ... */`），未闭合注释吞至区间末尾
+fn extract_css_comments(text: &str) -> Vec<String> {
+    let bytes = text.as_bytes();
+    let mut out = Vec::new();
     let mut i = 0;
-    while i < chars.len() {
-        let c = chars[i];
-        if let Some(q) = in_string {
-            out.push(c);
-            if c == q {
-                // check escaped
-                let mut backslashes = 0;
-                let mut j = i as isize - 1;
-                while j >= 0 && chars[j as usize] == '\\' {
-                    backslashes += 1;
-                    j -= 1;
-                }
-                if backslashes % 2 == 0 {
-                    in_string = None;
-                }
-            }
-            i += 1;
-            continue;
-        }
-        if c == '"' || c == '\'' {
-            in_string = Some(c);
-            out.push(c);
-            i += 1;
-            continue;
-        }
-        // handle comment /* */
-        if c == '/' && i + 1 < chars.len() && chars[i + 1] == '*' {
-            out.push_str("/*");
-            i += 2;
-            while i + 1 < chars.len() {
-                if chars[i] == '*' && chars[i + 1] == '/' {
-                    out.push_str("*/");
-                    i += 2;
+    while i + 1 < bytes.len() {
+        if bytes[i] == b'/' && bytes[i + 1] == b'*' {
+            let start = i;
+            let mut end = bytes.len();
+            let mut j = i + 2;
+            while j + 1 < bytes.len() {
+                if bytes[j] == b'*' && bytes[j + 1] == b'/' {
+                    end = j + 2;
                     break;
-                } else {
-                    out.push(chars[i]);
-                    i += 1;
                 }
+                j += 1;
             }
-            continue;
+            out.push(text[start..end].to_string());
+            i = end;
+        } else {
+            i += 1;
         }
-        match c {
-            '{' => {
-                out.push_str(" {\n");
-                indent += 1;
-                out.push_str(&"  ".repeat(indent));
-            }
-            '}' => {
-                out.push('\n');
-                indent = indent.saturating_sub(1);
-                out.push_str(&"  ".repeat(indent));
-                out.push('}');
-                if i + 1 < chars.len() && chars[i + 1] != '}' {
-                    out.push('\n');
-                    out.push_str(&"  ".repeat(indent));
-                }
-            }
-            ';' => {
-                out.push(';');
-                // peek next non-whitespace
-                let mut j = i + 1;
-                while j < chars.len() && chars[j].is_whitespace() {
-                    j += 1;
-                }
-                if j < chars.len() && chars[j] != '}' {
-                    out.push('\n');
-                    out.push_str(&"  ".repeat(indent));
-                }
-            }
-            ':' => {
-                out.push_str(": ");
-            }
-            ',' => {
-                out.push_str(", ");
-            }
-            _ => {
-                if c.is_whitespace() {
-                    // collapse whitespace to single space if needed
-                    if !out.ends_with(' ') && !out.ends_with('\n') && !out.ends_with("  ") {
-                        // only add space if previous is not whitespace
-                        // check next char is not whitespace
-                    }
-                    // skip whitespace in minified should not happen
-                } else {
-                    out.push(c);
-                }
-            }
-        }
-        i += 1;
     }
-    out.trim().to_string() + "\n"
+    out
 }
 
+/// 上一个真实 token（非空白）的结构种类
+#[derive(Clone, Copy, PartialEq)]
+enum PrevKind {
+    None,
+    BlockOpen,
+    Semicolon,
+    CloseCurly,
+    Other,
+}
+
+/// tokens[i] 之后（含 i）的第一个真实 token 索引
+fn next_real_index(tokens: &[styloria::span::Spanned<styloria::token::Token>], i: usize) -> Option<usize> {
+    tokens[i + 1..]
+        .iter()
+        .position(|t| !matches!(t.node, styloria::token::Token::Whitespace))
+        .map(|p| i + 1 + p)
+}
+
+/// 声明名值冒号判定：块内组深度 0 的 `:`，其后在组深度 0 先遇 `;`/`}` 为声明冒号，
+/// 先遇 `{` 为选择器伪类冒号（嵌套规则）；`--` 自定义属性始终视为声明冒号
+fn is_declaration_colon(
+    tokens: &[styloria::span::Spanned<styloria::token::Token>],
+    idx: usize,
+    prev_is_custom_prop: bool,
+) -> bool {
+    if prev_is_custom_prop {
+        return true;
+    }
+    let mut depth = 0usize;
+    for t in &tokens[idx + 1..] {
+        match &t.node {
+            styloria::token::Token::LeftParen | styloria::token::Token::LeftSquare => depth += 1,
+            styloria::token::Token::RightParen | styloria::token::Token::RightSquare => depth = depth.saturating_sub(1),
+            styloria::token::Token::LeftCurly if depth == 0 => return false,
+            styloria::token::Token::Semicolon | styloria::token::Token::RightCurly if depth == 0 => return true,
+            _ => {}
+        }
+    }
+    true
+}
+
+/// 基于 styloria Tokenizer 的 CSS 美化（2 空格缩进）
+///
+/// token 一律从源文本原样切片输出（零转义/内容损失），空白只归一化不删除——
+/// 保留 `0 auto`、后代选择器 `.a .b`、`calc(100% - 20px)` 等语义空格；
+/// 注释从 token 间隙提取原样保留；仅对组深度 0 的 `{}`/`;` 做换行缩进，
+/// 声明名值冒号（`color: red`）后补空格，伪类冒号（`a:hover`）保持原样
 fn format_css_content(content: &str) -> AppResult<String> {
-    // 使用 styloria 解析后序列化为 minified，再美化
-    let sheet = styloria::Parser::parse_stylesheet(content);
-    let minified = styloria::serialize_stylesheet(&sheet);
-    if minified.trim().is_empty() {
+    use styloria::span::Spanned;
+    use styloria::token::Token;
+    use styloria::tokenizer::Tokenizer;
+
+    let tokens: Vec<Spanned<Token>> = Tokenizer::new(content).spanned().collect();
+
+    let mut out = String::new();
+    let mut indent = 0usize;
+    let mut group_depth = 0usize;
+    let mut prev_end = 0usize;
+    let mut prev_real: Option<usize> = None;
+    let mut prev_kind = PrevKind::None;
+    let mut prev_is_open_paren = false;
+    let mut sep_pending = false;
+
+    let trim_trailing_ws = |out: &mut String| {
+        while out.ends_with(' ') || out.ends_with('\t') {
+            out.pop();
+        }
+    };
+    let ends_ws = |out: &str| out.ends_with([' ', '\t', '\n']);
+
+    for (i, st) in tokens.iter().enumerate() {
+        // 1) 间隙注释（原样保留）
+        let gap = &content[prev_end..st.span.start];
+        let comments = extract_css_comments(gap);
+        if !comments.is_empty() {
+            if !ends_ws(&out) {
+                out.push(' ');
+            }
+            for c in &comments {
+                out.push_str(c);
+            }
+            if !ends_ws(&out) {
+                out.push(' ');
+            }
+            sep_pending = true;
+        }
+        if gap.chars().any(|c| c.is_whitespace()) {
+            sep_pending = true;
+        }
+
+        // 2) 空白 token：仅记录间隔，交由下一个真实 token 决策
+        if matches!(st.node, Token::Whitespace) {
+            sep_pending = true;
+            prev_end = st.span.end;
+            continue;
+        }
+
+        let cur_group0 = group_depth == 0;
+        let prev_is_custom_prop = prev_real.is_some_and(|p| matches!(&tokens[p].node, Token::Ident(s) if s.starts_with("--")));
+        let decl_colon =
+            cur_group0 && indent > 0 && (prev_is_custom_prop || is_declaration_colon(&tokens, i, prev_is_custom_prop));
+
+        // 3) 结构间隔（无条件）与空白保留（仅在有间隔时）
+        match &st.node {
+            Token::RightCurly if cur_group0 => {
+                if prev_kind != PrevKind::BlockOpen {
+                    trim_trailing_ws(&mut out);
+                    if !out.ends_with('\n') {
+                        out.push('\n');
+                    }
+                    out.push_str(&"  ".repeat(indent.saturating_sub(1)));
+                }
+            }
+            Token::Semicolon if cur_group0 => trim_trailing_ws(&mut out),
+            Token::Comma | Token::RightParen | Token::RightSquare => trim_trailing_ws(&mut out),
+            Token::Colon if decl_colon => trim_trailing_ws(&mut out),
+            _ => match prev_kind {
+                PrevKind::BlockOpen | PrevKind::Semicolon => {}
+                PrevKind::CloseCurly => {
+                    if !matches!(
+                        st.node,
+                        Token::Semicolon | Token::Comma | Token::RightParen | Token::RightSquare
+                    ) {
+                        trim_trailing_ws(&mut out);
+                        if !out.ends_with('\n') {
+                            out.push('\n');
+                        }
+                        out.push_str(&"  ".repeat(indent));
+                    }
+                }
+                PrevKind::Other if prev_is_open_paren => {}
+                PrevKind::Other if sep_pending && !ends_ws(&out) => out.push(' '),
+                _ => {}
+            },
+        }
+
+        // 4) 输出 token（源文本原样切片）
+        match &st.node {
+            Token::Whitespace => unreachable!(),
+            Token::LeftCurly if cur_group0 => {
+                if !ends_ws(&out) {
+                    out.push(' ');
+                }
+                out.push('{');
+                indent += 1;
+                out.push('\n');
+                out.push_str(&"  ".repeat(indent));
+            }
+            Token::RightCurly if cur_group0 => {
+                indent = indent.saturating_sub(1);
+                out.push('}');
+            }
+            Token::Semicolon if cur_group0 => {
+                out.push(';');
+                out.push('\n');
+                out.push_str(&"  ".repeat(indent));
+            }
+            Token::LeftParen => {
+                out.push('(');
+                group_depth += 1;
+            }
+            Token::LeftSquare => {
+                out.push('[');
+                group_depth += 1;
+            }
+            Token::RightParen => {
+                out.push(')');
+                group_depth = group_depth.saturating_sub(1);
+            }
+            Token::RightSquare => {
+                out.push(']');
+                group_depth = group_depth.saturating_sub(1);
+            }
+            Token::Comma => {
+                out.push(',');
+                if let Some(next) = next_real_index(&tokens, i)
+                    && !matches!(
+                        &tokens[next].node,
+                        Token::RightParen | Token::RightSquare | Token::RightCurly | Token::Comma | Token::Semicolon
+                    )
+                {
+                    out.push(' ');
+                }
+            }
+            Token::Colon => {
+                if decl_colon {
+                    out.push_str(": ");
+                } else {
+                    out.push(':');
+                }
+            }
+            _ => out.push_str(st.span.slice(content)),
+        }
+
+        // 5) 更新状态
+        prev_kind = if cur_group0 {
+            match &st.node {
+                Token::LeftCurly => PrevKind::BlockOpen,
+                Token::Semicolon => PrevKind::Semicolon,
+                Token::RightCurly => PrevKind::CloseCurly,
+                _ => PrevKind::Other,
+            }
+        } else {
+            PrevKind::Other
+        };
+        prev_is_open_paren = matches!(st.node, Token::LeftParen | Token::LeftSquare);
+        prev_real = Some(i);
+        prev_end = st.span.end;
+        sep_pending = false;
+    }
+
+    let out = out.trim().to_string();
+    if out.is_empty() {
         return Err(AppError::new(CODE_ERROR, "[build] CSS 解析为空"));
     }
-    Ok(pretty_css_minified(&minified))
+    Ok(format!("{out}\n"))
 }
 
 /// 整目录一键格式化（xhtml/opf/xml/css，2 空格缩进，失败不落盘）
@@ -1240,7 +1375,7 @@ pub(crate) fn build_epub(
     } else {
         let inner = descriptions
             .iter()
-            .map(|d| format!(r#"<span class="desc-line">{}</span>"#, escape_xml(d)))
+            .map(|d| format!(r#"<p class="desc-line">{}</p>"#, escape_xml(d)))
             .collect::<Vec<_>>()
             .join("\n");
         format!(r#"<div class="book-description">{inner}</div>"#)
@@ -1417,5 +1552,57 @@ mod tests {
         assert!(formatted.contains("p {"));
         assert!(formatted.contains("  color:"));
         assert!(formatted.contains("\n"));
+    }
+
+    #[test]
+    fn test_format_css_keeps_semantic_spaces() {
+        // 多值/后代选择器/组合器/calc 等语义空格不得删除
+        let raw = "p{margin:0 auto}.a .b{width:calc(100% - 20px)}.x > .y + .z{color:red}";
+        let out = format_css_content(raw).unwrap();
+        assert!(out.contains("margin: 0 auto"), "{out}");
+        assert!(out.contains(".a .b {"), "{out}");
+        assert!(out.contains("calc(100% - 20px)"), "{out}");
+        assert!(out.contains(".x > .y + .z {"), "{out}");
+    }
+
+    #[test]
+    fn test_format_css_pseudo_and_at_rules() {
+        // 伪类/伪元素冒号后不加空格，@media 块保持嵌套缩进
+        let raw = "a:hover::before{content:\"x\"}@media screen and (min-width:10px){p{color:red}}";
+        let out = format_css_content(raw).unwrap();
+        assert!(out.contains("a:hover::before {"), "{out}");
+        assert!(out.contains("content: \"x\""), "{out}");
+        assert!(out.contains("@media screen and (min-width:10px) {"), "{out}");
+        assert!(out.contains("  p {"), "{out}");
+        assert!(out.contains("    color: red"), "{out}");
+    }
+
+    #[test]
+    fn test_format_css_preserves_comments_and_url() {
+        let raw = "/* note */ body{background:url(data:image/png;base64,AAAA)}";
+        let out = format_css_content(raw).unwrap();
+        assert!(out.contains("/* note */"), "{out}");
+        assert!(out.contains("url(data:image/png;base64,AAAA)"), "{out}");
+    }
+
+    #[test]
+    fn test_format_css_idempotent() {
+        let raw = "html, body { margin: 0 auto; }\n.cover-frame img { object-fit: cover; }";
+        let once = format_css_content(raw).unwrap();
+        let twice = format_css_content(&once).unwrap();
+        assert_eq!(once, twice);
+        assert!(once.contains("margin: 0 auto"), "{once}");
+    }
+
+    #[test]
+    fn test_format_css_template_base_css() {
+        // 真实模板回归：语义空格（多值/后代/组合器）与注释必须原样保留
+        let raw = include_str!("../../templates/EPUB33-NOVEL/EPUB/styles/base.css");
+        let out = format_css_content(raw).unwrap();
+        assert!(out.contains("margin: 0 auto"), "{out}");
+        assert!(out.contains(".titlepage-frame > * + *"), "{out}");
+        assert!(out.contains(".cover-frame .book-title"), "{out}");
+        assert!(out.contains("/* 封面：占满整个画面，无滚动条 */"), "{out}");
+        assert!(out.contains("html, body {"), "{out}");
     }
 }

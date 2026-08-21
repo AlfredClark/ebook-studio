@@ -19,23 +19,40 @@ pub fn get_build(app: AppHandle, identifier: String) -> Response<Option<BuildRes
 /// 执行构建（基于 split.json + metadata.json 生成未压缩 EPUB，支持标题/编号格式）
 /// 前端调用：`invokeCommand<BuildResult>("build_epub", { identifier, chapterTitleFormat, volumeTitleFormat, numberFormat })`
 #[tauri::command]
-pub fn build_epub(
+pub async fn build_epub(
     app: AppHandle,
     identifier: String,
     chapter_title_format: Option<String>,
     volume_title_format: Option<String>,
     number_format: Option<String>,
 ) -> Response<BuildResult> {
-    build_feat::build_epub(&app, &identifier, chapter_title_format, volume_title_format, number_format).into()
+    let app_clone = app.clone();
+    let res = tauri::async_runtime::spawn_blocking(move || {
+        build_feat::build_epub(
+            &app_clone,
+            &identifier,
+            chapter_title_format,
+            volume_title_format,
+            number_format,
+        )
+    })
+    .await;
+    match res {
+        Ok(inner) => inner.into(),
+        Err(e) => Response::err(crate::cores::response::CODE_ERROR, format!("[build] 构建任务失败: {e}")),
+    }
 }
 
 /// 删除构建目录（重新构建前）
 /// 前端调用：`invokeCommand<boolean>("remove_build", { identifier })`
 #[tauri::command]
-pub fn remove_build(app: AppHandle, identifier: String) -> Response<bool> {
-    match build_feat::remove_build(&app, &identifier) {
-        Ok(()) => Response::ok(true),
-        Err(e) => Response::err(e.code, e.message),
+pub async fn remove_build(app: AppHandle, identifier: String) -> Response<bool> {
+    let app_clone = app.clone();
+    let res = tauri::async_runtime::spawn_blocking(move || build_feat::remove_build(&app_clone, &identifier)).await;
+    match res {
+        Ok(Ok(())) => Response::ok(true),
+        Ok(Err(e)) => Response::err(e.code, e.message),
+        Err(e) => Response::err(crate::cores::response::CODE_ERROR, format!("[build] 删除任务失败: {e}")),
     }
 }
 
