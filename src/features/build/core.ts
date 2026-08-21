@@ -13,11 +13,33 @@ export async function getBuild(identifier: string): Promise<BuildResult | null> 
 }
 
 /**
- * 执行构建（基于 split.json + metadata.json 生成未压缩 EPUB）
+ * 执行构建（基于 split.json + metadata.json 生成未压缩 EPUB，支持标题与编号格式）
+ * @param identifier 项目标识
+ * @param chapterTitleFormat 章节标题格式，如 第{order}章 {title}
+ * @param volumeTitleFormat 卷标题格式，如 第{order}卷 {title}
+ * @param numberFormat 编号格式：arabic | arabic_padded | chinese_lower | chinese_upper
+ */
+export async function buildEpub(
+  identifier: string,
+  chapterTitleFormat?: string,
+  volumeTitleFormat?: string,
+  numberFormat?: string,
+): Promise<BuildResult | null> {
+  return invokeCommand<BuildResult>("build_epub", {
+    identifier,
+    chapterTitleFormat: chapterTitleFormat?.trim() || null,
+    volumeTitleFormat: volumeTitleFormat?.trim() || null,
+    numberFormat: numberFormat?.trim() || null,
+  });
+}
+
+/**
+ * 删除构建目录（重新构建前）
  * @param identifier 项目标识
  */
-export async function buildEpub(identifier: string): Promise<BuildResult | null> {
-  return invokeCommand<BuildResult>("build_epub", { identifier });
+export async function removeBuild(identifier: string): Promise<boolean> {
+  const r = await invokeCommand<boolean>("remove_build", { identifier });
+  return r ?? false;
 }
 
 /**

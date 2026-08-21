@@ -14,3 +14,11 @@ export interface BuildResult {
   files: BuildFile[];
   bookTitle: string;
 }
+
+export type NumberFormat = "arabic" | "arabic_padded" | "chinese_lower" | "chinese_upper";
+
+export interface BuildOptions {
+  chapterTitleFormat: string;
+  volumeTitleFormat: string;
+  numberFormat: NumberFormat;
+}

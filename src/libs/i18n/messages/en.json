@@ -350,5 +350,17 @@
   "build_edit_hint": "Edit and save to persist. Switching files discards unsaved changes.",
   "build_binary_hint": "Binary file cannot be previewed",
   "build_no_files": "No files",
+  "build_chapter_title_format_label": "Chapter Title Format",
+  "build_chapter_title_format_placeholder": "e.g. Chapter {order} {title}",
+  "build_volume_title_format_label": "Volume Title Format",
+  "build_volume_title_format_placeholder": "e.g. Volume {order} {title}",
+  "build_number_format_label": "Number Format",
+  "build_number_format_arabic": "Arabic",
+  "build_number_format_padded": "Padded Arabic",
+  "build_number_format_chinese_lower": "Chinese Lower",
+  "build_number_format_chinese_upper": "Chinese Upper",
+  "build_remove_success": "Build removed",
+  "build_remove_failed": "Failed to remove",
+  "build_title_format_hint": "Placeholders {order} and {title}, {title} required",
   "footer_copyright": "Copyright © {year} {author}"
 }

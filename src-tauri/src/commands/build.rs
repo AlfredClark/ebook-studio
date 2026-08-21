@@ -13,11 +13,27 @@ pub fn get_build(app: AppHandle, identifier: String) -> Response<Option<BuildRes
     build_feat::get_build(&app, &identifier).into()
 }
 
-/// 执行构建（基于 split.json + metadata.json 生成未压缩 EPUB）
-/// 前端调用：`invokeCommand<BuildResult>("build_epub", { identifier })`
+/// 执行构建（基于 split.json + metadata.json 生成未压缩 EPUB，支持标题/编号格式）
+/// 前端调用：`invokeCommand<BuildResult>("build_epub", { identifier, chapterTitleFormat, volumeTitleFormat, numberFormat })`
 #[tauri::command]
-pub fn build_epub(app: AppHandle, identifier: String) -> Response<BuildResult> {
-    build_feat::build_epub(&app, &identifier).into()
+pub fn build_epub(
+    app: AppHandle,
+    identifier: String,
+    chapter_title_format: Option<String>,
+    volume_title_format: Option<String>,
+    number_format: Option<String>,
+) -> Response<BuildResult> {
+    build_feat::build_epub(&app, &identifier, chapter_title_format, volume_title_format, number_format).into()
+}
+
+/// 删除构建目录（重新构建前）
+/// 前端调用：`invokeCommand<boolean>("remove_build", { identifier })`
+#[tauri::command]
+pub fn remove_build(app: AppHandle, identifier: String) -> Response<bool> {
+    match build_feat::remove_build(&app, &identifier) {
+        Ok(()) => Response::ok(true),
+        Err(e) => Response::err(e.code, e.message),
+    }
 }
 
 /// 读取构建目录下指定文件的文本内容

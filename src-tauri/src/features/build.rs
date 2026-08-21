@@ -23,6 +23,9 @@ const SPLIT_NAME: &str = "split.json";
 const METADATA_FILE: &str = "metadata.json";
 const BUILD_DIR: &str = "build";
 
+const DEFAULT_CHAPTER_TITLE_FORMAT: &str = "第{order}章 {title}";
+const DEFAULT_VOLUME_TITLE_FORMAT: &str = "第{order}卷 {title}";
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BuildFile {
@@ -212,6 +215,50 @@ fn collect_build_files(root: &Path, base: &Path) -> AppResult<Vec<BuildFile>> {
     build_file_tree(root, base)
 }
 
+fn format_number_display(order: i32, number_format: &str, pad_width: usize) -> String {
+    match number_format {
+        "arabic" => order.to_string(),
+        "arabic_padded" => format!("{order:0>width$}", width = pad_width),
+        "chinese_lower" => {
+            use chinese_number::{ChineseCase, ChineseCountMethod, ChineseVariant, NumberToChinese};
+            match order.to_chinese(ChineseVariant::Simple, ChineseCase::Lower, ChineseCountMethod::TenThousand) {
+                Ok(s) => s,
+                Err(_) => order.to_string(),
+            }
+        }
+        "chinese_upper" => {
+            use chinese_number::{ChineseCase, ChineseCountMethod, ChineseVariant, NumberToChinese};
+            // 尝试繁体大写，若失败回退简体大写
+            match order.to_chinese(ChineseVariant::Simple, ChineseCase::Upper, ChineseCountMethod::TenThousand) {
+                Ok(s) => s,
+                Err(_) => order.to_string(),
+            }
+        }
+        _ => order.to_string(),
+    }
+}
+
+fn apply_title_format(format: &str, order_str: &str, title: &str) -> String {
+    // 必须包含 {title}，若不含则直接返回标题；{order} 可选
+    let mut out = format.to_string();
+    if format.contains("{order}") {
+        out = out.replace("{order}", order_str);
+    }
+    if format.contains("{title}") {
+        out = out.replace("{title}", title);
+    } else {
+        // 若模板未包含 {title}，则追加标题
+        if !out.contains(title) {
+            out = format!("{out} {title}");
+        }
+    }
+    out.trim().to_string()
+}
+
+fn compute_pad_width(count: usize) -> usize {
+    count.to_string().len().max(2)
+}
+
 /// 查询已构建的 EPUB 目录（若不存在返回 None）
 pub(crate) fn get_build(app: &AppHandle, identifier: &str) -> AppResult<Option<BuildResult>> {
     let id = identifier.trim().to_string();
@@ -270,8 +317,29 @@ pub(crate) fn get_build(app: &AppHandle, identifier: &str) -> AppResult<Option<B
     }))
 }
 
+/// 删除已构建的目录（用于重新构建流程）
+pub(crate) fn remove_build(app: &AppHandle, identifier: &str) -> AppResult<()> {
+    let id = identifier.trim().to_string();
+    if id.is_empty() {
+        return Err(AppError::new(CODE_ERROR, "[build] identifier 不能为空"));
+    }
+    let (project_dir, _uuid, _) = resolve_project_base(app, &id)?;
+    let build_base = project_dir.join(BUILD_DIR);
+    if build_base.exists() {
+        fs::remove_dir_all(&build_base).map_err(|e| AppError::new(CODE_ERROR, format!("[build] 删除构建目录失败: {e}")))?;
+        log::info!("[build] removed {} for {}", build_base.display(), id);
+    }
+    Ok(())
+}
+
 /// 执行构建
-pub(crate) fn build_epub(app: &AppHandle, identifier: &str) -> AppResult<BuildResult> {
+pub(crate) fn build_epub(
+    app: &AppHandle,
+    identifier: &str,
+    chapter_title_format: Option<String>,
+    volume_title_format: Option<String>,
+    number_format: Option<String>,
+) -> AppResult<BuildResult> {
     let id = identifier.trim().to_string();
     if id.is_empty() {
         return Err(AppError::new(CODE_ERROR, "[build] identifier 不能为空"));
@@ -306,6 +374,51 @@ pub(crate) fn build_epub(app: &AppHandle, identifier: &str) -> AppResult<BuildRe
         fs::read_to_string(&split_path).map_err(|e| AppError::new(CODE_ERROR, format!("[build] 读取 split 失败: {e}")))?;
     let split: SplitResult =
         serde_json::from_str(&split_data).map_err(|e| AppError::new(CODE_ERROR, format!("[build] 解析 split 失败: {e}")))?;
+
+    // 计算补零宽度（自适应，卷与章节分开计算）
+    let total_volumes = split.volumes.as_ref().map(|v| v.len()).unwrap_or(0);
+    let total_chapters = if split.type_ == "pure_chapters" {
+        split.chapters.as_ref().map(|chs| chs.len()).unwrap_or(0)
+    } else {
+        split
+            .volumes
+            .as_ref()
+            .map(|vols| vols.iter().map(|v| v.chapters.len()).sum())
+            .unwrap_or(0)
+    };
+    let chap_pad_width = compute_pad_width(total_chapters);
+    let vol_pad_width = compute_pad_width(total_volumes);
+
+    // 标题与编号格式（带校验）
+    let chap_fmt_raw = chapter_title_format
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| DEFAULT_CHAPTER_TITLE_FORMAT.to_string());
+    let vol_fmt_raw = volume_title_format
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| DEFAULT_VOLUME_TITLE_FORMAT.to_string());
+    let num_fmt_raw = number_format
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "arabic".to_string());
+
+    // 校验必须含 {title}
+    let chap_fmt = if chap_fmt_raw.contains("{title}") {
+        chap_fmt_raw.clone()
+    } else {
+        // 若不含 title 占位，强制追加
+        format!("{chap_fmt_raw} {{title}}")
+    };
+    let vol_fmt = if vol_fmt_raw.contains("{title}") {
+        vol_fmt_raw.clone()
+    } else {
+        format!("{vol_fmt_raw} {{title}}")
+    };
+    let num_fmt = match num_fmt_raw.as_str() {
+        "arabic" | "arabic_padded" | "chinese_lower" | "chinese_upper" => num_fmt_raw.clone(),
+        _ => "arabic".to_string(),
+    };
 
     // 清理旧 build
     let build_base = project_dir.join(BUILD_DIR);
@@ -421,20 +534,24 @@ pub(crate) fn build_epub(app: &AppHandle, identifier: &str) -> AppResult<BuildRe
         cover_block = format!(r#"<h1 class="book-title">{}</h1>"#, escape_xml(&title));
     }
 
-    // 收集章节/卷信息用于 manifest/spine/toc
+    // 收集章节/卷信息用于 manifest/spine/toc（带补零）
+    #[allow(dead_code)]
     #[derive(Clone)]
     struct ChapInfo {
         id: String,
         href: String,
         title: String,
+        display_title: String,
         vol_order: Option<i32>,
         chap_order: i32,
     }
+    #[allow(dead_code)]
     #[derive(Clone)]
     struct VolInfo {
         id: String,
         href: String,
         title: String,
+        display_title: String,
         order: i32,
     }
 
@@ -444,34 +561,61 @@ pub(crate) fn build_epub(app: &AppHandle, identifier: &str) -> AppResult<BuildRe
     if split.type_ == "pure_chapters" {
         if let Some(chs) = &split.chapters {
             for ch in chs {
-                let id = format!("chapter-{}", ch.order);
+                let padded = format!("{:0>width$}", ch.order, width = chap_pad_width);
+                let formatted_order = format_number_display(ch.order, &num_fmt, chap_pad_width);
+                let display_title = apply_title_format(&chap_fmt, &formatted_order, &ch.title);
+                // 为了展示需要保留 padded 与 formatted 区别：文件名用 padded 阿拉伯，标题用 formatted
+                // 但若 number_format 本身为 arabic_padded，则两者一致；否则文件名用 padded，标题用 formatted
+                let file_padded = if num_fmt == "arabic_padded" {
+                    formatted_order.clone()
+                } else {
+                    padded.clone()
+                };
+                let id = format!("chapter-{file_padded}");
                 let href = format!("text/{id}.xhtml");
                 chap_infos.push(ChapInfo {
                     id: id.clone(),
                     href: href.clone(),
                     title: ch.title.clone(),
+                    display_title,
                     vol_order: None,
                     chap_order: ch.order,
                 });
+                let _ = padded;
+                let _ = file_padded;
             }
         }
     } else if let Some(vols) = &split.volumes {
         for vol in vols {
-            let vol_id = format!("volume-{}", vol.order);
+            let padded_vol = format!("{:0>width$}", vol.order, width = vol_pad_width);
+            let formatted_vol_order = format_number_display(vol.order, &num_fmt, vol_pad_width);
+            let display_vol_title = apply_title_format(&vol_fmt, &formatted_vol_order, &vol.title);
+            let vol_id = format!("volume-{padded_vol}");
             let vol_href = format!("text/{vol_id}.xhtml");
             vol_infos.push(VolInfo {
                 id: vol_id.clone(),
                 href: vol_href,
                 title: vol.title.clone(),
+                display_title: display_vol_title,
                 order: vol.order,
             });
             for ch in &vol.chapters {
-                let chap_id = format!("chapter-{}-{}", vol.order, ch.order);
+                let padded_chap = format!("{:0>width$}", ch.order, width = chap_pad_width);
+                let formatted_chap_order = format_number_display(ch.order, &num_fmt, chap_pad_width);
+                let display_chap_title = apply_title_format(&chap_fmt, &formatted_chap_order, &ch.title);
+                let file_padded_vol = padded_vol.clone();
+                let file_padded_chap = if num_fmt == "arabic_padded" {
+                    formatted_chap_order.clone()
+                } else {
+                    padded_chap.clone()
+                };
+                let chap_id = format!("chapter-{file_padded_vol}-{file_padded_chap}");
                 let chap_href = format!("text/{chap_id}.xhtml");
                 chap_infos.push(ChapInfo {
                     id: chap_id,
                     href: chap_href,
                     title: ch.title.clone(),
+                    display_title: display_chap_title,
                     vol_order: Some(vol.order),
                     chap_order: ch.order,
                 });
@@ -547,7 +691,7 @@ pub(crate) fn build_epub(app: &AppHandle, identifier: &str) -> AppResult<BuildRe
             .collect::<Vec<_>>()
             .join("\n");
         let rendered = chapter_tpl
-            .replace("{{CHAPTER_TITLE}}", &escape_xml(&src_chap.title))
+            .replace("{{CHAPTER_TITLE}}", &escape_xml(&chap.display_title))
             .replace("{{CHAPTER_BODY}}", &body);
         fs::write(text_dir.join(format!("{}.xhtml", chap.id)), rendered)
             .map_err(|e| AppError::new(CODE_ERROR, format!("[build] 写入 {} 失败: {e}", chap.id)))?;
@@ -569,7 +713,7 @@ pub(crate) fn build_epub(app: &AppHandle, identifier: &str) -> AppResult<BuildRe
             "".to_string()
         };
         let rendered = volume_tpl
-            .replace("{{VOLUME_TITLE}}", &escape_xml(&src_vol.title))
+            .replace("{{VOLUME_TITLE}}", &escape_xml(&vol.display_title))
             .replace("{{VOLUME_INTRO}}", &intro_html);
         fs::write(text_dir.join(format!("{}.xhtml", vol.id)), rendered)
             .map_err(|e| AppError::new(CODE_ERROR, format!("[build] 写入 {} 失败: {e}", vol.id)))?;
@@ -577,8 +721,6 @@ pub(crate) fn build_epub(app: &AppHandle, identifier: &str) -> AppResult<BuildRe
 
     // 生成 content.opf
     let mut opf_tpl = read_template(app, "EPUB33-NOVEL/EPUB/content.opf")?;
-    // 处理语言占位（模板硬编码 zh-CN，统一替换）
-    // 先处理通用占位
     // 构造 manifest/items
     let mut manifest_items = String::new();
     for vol in &vol_infos {
@@ -613,62 +755,61 @@ pub(crate) fn build_epub(app: &AppHandle, identifier: &str) -> AppResult<BuildRe
         spine_items.pop();
     }
 
-    // optional DC 块
-    let mut optional_meta = String::new();
-    if let Some(p) = &publisher {
-        optional_meta.push_str(&format!("    <dc:publisher>{}</dc:publisher>\n", escape_xml(p)));
-    }
-    if let Some(d) = &date {
-        optional_meta.push_str(&format!("    <dc:date>{}</dc:date>\n", escape_xml(d)));
-    }
-    if let Some(r) = &rights {
-        optional_meta.push_str(&format!("    <dc:rights>{}</dc:rights>\n", escape_xml(r)));
-    }
-    if let Some(s) = &source {
-        optional_meta.push_str(&format!("    <dc:source>{}</dc:source>\n", escape_xml(s)));
-    }
-    if let Some(r) = &relation {
-        optional_meta.push_str(&format!("    <dc:relation>{}</dc:relation>\n", escape_xml(r)));
-    }
-    if let Some(c) = &coverage {
-        optional_meta.push_str(&format!("    <dc:coverage>{}</dc:coverage>\n", escape_xml(c)));
-    }
-    // 去尾换行
-    if optional_meta.ends_with('\n') {
-        optional_meta.pop();
-    }
-
-    let description_block = if descriptions.is_empty() {
-        "".to_string()
-    } else {
-        descriptions
+    // 统一其他元数据块：description（单标签 &#10;）+ subjects + publisher/date/rights/source/relation/coverage，按块空行分隔
+    let mut other_blocks: Vec<String> = Vec::new();
+    if !descriptions.is_empty() {
+        let joined = descriptions
             .iter()
-            .map(|d| format!("    <dc:description>{}</dc:description>", escape_xml(d)))
+            .map(|d| escape_xml(d.trim()))
             .collect::<Vec<_>>()
-            .join("\n")
-    };
-    let subjects_block = if subjects.is_empty() {
-        "".to_string()
-    } else {
-        subjects
+            .join("&#10;");
+        other_blocks.push(format!("    <dc:description>{joined}</dc:description>"));
+    }
+    if !subjects.is_empty() {
+        let subjects_block = subjects
             .iter()
             .map(|s| format!("    <dc:subject>{}</dc:subject>", escape_xml(s)))
             .collect::<Vec<_>>()
-            .join("\n")
-    };
+            .join("\n");
+        other_blocks.push(subjects_block);
+    }
+    let mut optional_lines: Vec<String> = Vec::new();
+    if let Some(p) = &publisher {
+        optional_lines.push(format!("    <dc:publisher>{}</dc:publisher>", escape_xml(p)));
+    }
+    if let Some(d) = &date {
+        optional_lines.push(format!("    <dc:date>{}</dc:date>", escape_xml(d)));
+    }
+    if let Some(r) = &rights {
+        optional_lines.push(format!("    <dc:rights>{}</dc:rights>", escape_xml(r)));
+    }
+    if let Some(s) = &source {
+        optional_lines.push(format!("    <dc:source>{}</dc:source>", escape_xml(s)));
+    }
+    if let Some(r) = &relation {
+        optional_lines.push(format!("    <dc:relation>{}</dc:relation>", escape_xml(r)));
+    }
+    if let Some(c) = &coverage {
+        optional_lines.push(format!("    <dc:coverage>{}</dc:coverage>", escape_xml(c)));
+    }
+    if !optional_lines.is_empty() {
+        other_blocks.push(optional_lines.join("\n"));
+    }
+    let other_metadata = other_blocks.join("\n\n");
 
-    // contributor 块处理：若无则置空（后续会清理空的 contributor 标签？简单保留空则删除）
+    // contributor 块处理：若无则置空（后续会清理空的 contributor 标签）
     let contributor_val = contributor.unwrap_or_default();
 
-    // 先替换主要占位
+    // 先替换主要占位（OTHER_METADATA 统一，兼容旧 BOOK_DESCRIPTION/BOOK_SUBJECTS）
     opf_tpl = opf_tpl
         .replace("{{BOOK_UUID}}", &escape_xml(&book_uuid))
         .replace("{{BOOK_TITLE}}", &escape_xml(&title))
         .replace("{{BOOK_MODIFIED}}", &escape_xml(&modified))
         .replace("{{BOOK_AUTHOR}}", &escape_xml(&book_author))
         .replace("{{CONTRIBUTOR}}", &escape_xml(&contributor_val))
-        .replace("{{BOOK_DESCRIPTION}}", &description_block)
-        .replace("{{BOOK_SUBJECTS}}", &subjects_block)
+        .replace("{{OTHER_METADATA}}", &other_metadata)
+        .replace("{{BOOK_DESCRIPTION}}", "")
+        .replace("{{BOOK_SUBJECTS}}", "")
         .replace("{{COVER_ITEM}}", &cover_item)
         .replace("{{MANIFEST_ITEMS}}", &manifest_items)
         .replace("{{SPINE_ITEMS}}", &spine_items)
@@ -683,13 +824,6 @@ pub(crate) fn build_epub(app: &AppHandle, identifier: &str) -> AppResult<BuildRe
             "<dc:language>zh-CN</dc:language>",
             &format!("<dc:language>{}</dc:language>", escape_xml(&language_esc)),
         );
-    }
-
-    // 注入可选 meta：插入到 {{BOOK_SUBJECTS}} 之后或 </metadata> 之前
-    if !optional_meta.is_empty() {
-        // 若模板已替换 BOOK_SUBJECTS，我们在 description/subjects 之后插入
-        // 简单在 </metadata> 前插入
-        opf_tpl = opf_tpl.replace("</metadata>", &format!("{optional_meta}\n  </metadata>"));
     }
 
     // 清理空的 contributor 段（若 contributor 为空，删除该块）
@@ -720,7 +854,11 @@ pub(crate) fn build_epub(app: &AppHandle, identifier: &str) -> AppResult<BuildRe
     // TOC: 若有卷则卷为一级，章为二级
     if !vol_infos.is_empty() {
         for vol in &vol_infos {
-            toc_list.push_str(&format!(r#"      <li><a href="{}">{}</a>"#, vol.href, escape_xml(&vol.title)));
+            toc_list.push_str(&format!(
+                r#"      <li><a href="{}">{}</a>"#,
+                vol.href,
+                escape_xml(&vol.display_title)
+            ));
             // 该卷下的章
             let chaps_for_vol: Vec<&ChapInfo> = chap_infos.iter().filter(|c| c.vol_order == Some(vol.order)).collect();
             if !chaps_for_vol.is_empty() {
@@ -729,7 +867,7 @@ pub(crate) fn build_epub(app: &AppHandle, identifier: &str) -> AppResult<BuildRe
                     toc_list.push_str(&format!(
                         r#"          <li><a href="{}">{}</a></li>"#,
                         chap.href,
-                        escape_xml(&chap.title)
+                        escape_xml(&chap.display_title)
                     ));
                     toc_list.push('\n');
                 }
@@ -740,7 +878,7 @@ pub(crate) fn build_epub(app: &AppHandle, identifier: &str) -> AppResult<BuildRe
             landmarks.push_str(&format!(
                 r#"      <li><a epub:type="volume" href="{}">{}</a></li>"#,
                 vol.href,
-                escape_xml(&vol.title)
+                escape_xml(&vol.display_title)
             ));
         }
         for chap in chap_infos.iter().filter(|c| c.vol_order.is_none()) {
@@ -748,7 +886,7 @@ pub(crate) fn build_epub(app: &AppHandle, identifier: &str) -> AppResult<BuildRe
             toc_list.push_str(&format!(
                 r#"      <li><a href="{}">{}</a></li>"#,
                 chap.href,
-                escape_xml(&chap.title)
+                escape_xml(&chap.display_title)
             ));
             toc_list.push('\n');
         }
@@ -757,14 +895,14 @@ pub(crate) fn build_epub(app: &AppHandle, identifier: &str) -> AppResult<BuildRe
             toc_list.push_str(&format!(
                 r#"      <li><a href="{}">{}</a></li>"#,
                 chap.href,
-                escape_xml(&chap.title)
+                escape_xml(&chap.display_title)
             ));
             toc_list.push('\n');
             landmarks.push('\n');
             landmarks.push_str(&format!(
                 r#"      <li><a epub:type="chapter" href="{}">{}</a></li>"#,
                 chap.href,
-                escape_xml(&chap.title)
+                escape_xml(&chap.display_title)
             ));
         }
     }
@@ -912,7 +1050,7 @@ fn find_book_root(project_dir: &Path) -> AppResult<Option<PathBuf>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{escape_xml, sanitize_title};
+    use super::{apply_title_format, compute_pad_width, escape_xml, format_number_display, sanitize_title};
 
     #[test]
     fn test_escape() {
@@ -924,5 +1062,32 @@ mod tests {
         assert_eq!(sanitize_title(" a/b:c*? "), "a_b_c__");
         assert_eq!(sanitize_title(""), "untitled");
         assert_eq!(sanitize_title("正常书名"), "正常书名");
+    }
+
+    #[test]
+    fn test_pad_width() {
+        assert_eq!(compute_pad_width(9), 2);
+        assert_eq!(compute_pad_width(10), 2);
+        assert_eq!(compute_pad_width(100), 3);
+        assert_eq!(compute_pad_width(999), 3);
+        assert_eq!(compute_pad_width(1000), 4);
+        assert_eq!(compute_pad_width(0), 2);
+    }
+
+    #[test]
+    fn test_format_number() {
+        assert_eq!(format_number_display(5, "arabic", 3), "5");
+        assert_eq!(format_number_display(5, "arabic_padded", 3), "005");
+        assert_eq!(format_number_display(12, "arabic_padded", 2), "12");
+        // 中文小写/大写不补零
+        assert_eq!(format_number_display(1, "chinese_lower", 3), "一");
+        assert_eq!(format_number_display(2, "chinese_upper", 3), "贰");
+    }
+
+    #[test]
+    fn test_apply_format() {
+        assert_eq!(apply_title_format("第{order}章 {title}", "5", "风起"), "第5章 风起");
+        assert_eq!(apply_title_format("{title}-{order}", "001", "序"), "序-001");
+        assert_eq!(apply_title_format("前言", "1", "前言"), "前言");
     }
 }

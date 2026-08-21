@@ -38,6 +38,7 @@ macro_rules! invoke_handlers {
             $crate::commands::clean::filter_clean,
             $crate::commands::build::get_build,
             $crate::commands::build::build_epub,
+            $crate::commands::build::remove_build,
             $crate::commands::build::read_build_file,
             $crate::commands::build::write_build_file,
             $crate::commands::build::get_build_path,

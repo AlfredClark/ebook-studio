@@ -203,11 +203,7 @@ fn parse_subjects(raw: Option<String>) -> Vec<String> {
 
 fn parse_description(raw: Option<String>) -> Vec<String> {
     match raw {
-        Some(s) => s
-            .lines()
-            .map(|x| x.trim_end().to_string())
-            .filter(|x| !x.trim().is_empty())
-            .collect(),
+        Some(s) => s.lines().map(|x| x.trim().to_string()).filter(|x| !x.is_empty()).collect(),
         None => Vec::new(),
     }
 }

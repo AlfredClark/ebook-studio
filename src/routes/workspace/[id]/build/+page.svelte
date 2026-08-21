@@ -15,8 +15,10 @@
   import SearchIcon from "@lucide/svelte/icons/search";
   import { Button } from "$components/ui/button";
   import { Input } from "$components/ui/input";
+  import { Label } from "$components/ui/label";
   import * as Resizable from "$components/ui/resizable";
   import { ScrollArea } from "$components/ui/scroll-area";
+  import { Select, SelectContent, SelectItem, SelectTrigger } from "$components/ui/select";
   import { Skeleton } from "$components/ui/skeleton";
   import { Textarea } from "$components/ui/textarea";
   import ConfirmDialog from "$components/widgets/overlay/ConfirmDialog.svelte";
@@ -25,8 +27,8 @@
   import { getProject } from "$features/projects";
   import type { Project } from "$features/projects";
   import { getSplitContent } from "$features/split";
-  import { getBuild, buildEpub, readBuildFile, writeBuildFile, getBuildPath } from "$features/build";
-  import type { BuildFile, BuildResult } from "$features/build";
+  import { getBuild, buildEpub, removeBuild, readBuildFile, writeBuildFile, getBuildPath } from "$features/build";
+  import type { BuildFile, BuildResult, NumberFormat } from "$features/build";
   import { revealItemInDir } from "@tauri-apps/plugin-opener";
 
   const id = $derived(page.params.id as string);
@@ -43,6 +45,7 @@
   let loadingBuild = $state(true);
   let pending = $state(false);
   let saving = $state(false);
+  let removing = $state(false);
 
   let search = $state("");
   let collapsedDirs = new SvelteSet<string>();
@@ -52,8 +55,24 @@
   let loadingFile = $state(false);
   let isText = $state(true);
 
+  // 构建格式状态
+  let chapterTitleFormat = $state("第{order}章 {title}");
+  let volumeTitleFormat = $state("第{order}卷 {title}");
+  let numberFormat = $state<NumberFormat>("arabic");
+
   const hasBuild = $derived(!!buildData);
   const dirty = $derived(draft !== originalContent);
+
+  const numberFormatOptions: Array<{ value: NumberFormat; label: () => string }> = [
+    { value: "arabic", label: m.build_number_format_arabic },
+    { value: "arabic_padded", label: m.build_number_format_padded },
+    { value: "chinese_lower", label: m.build_number_format_chinese_lower },
+    { value: "chinese_upper", label: m.build_number_format_chinese_upper },
+  ];
+
+  const numberFormatLabel = $derived(
+    numberFormatOptions.find((o) => o.value === numberFormat)?.label() ?? m.build_number_format_arabic(),
+  );
 
   function isTextFile(path: string): boolean {
     const ext = path.split(".").pop()?.toLowerCase() ?? "";
@@ -155,9 +174,17 @@
       toast.error(m.build_need_split());
       return;
     }
+    if (!chapterTitleFormat.includes("{title}")) {
+      toast.error(m.build_title_format_hint({ order: "{order}", title: "{title}" }));
+      return;
+    }
+    if (!volumeTitleFormat.includes("{title}")) {
+      toast.error(m.build_title_format_hint({ order: "{order}", title: "{title}" }));
+      return;
+    }
     pending = true;
     try {
-      const res = await buildEpub(identifier);
+      const res = await buildEpub(identifier, chapterTitleFormat, volumeTitleFormat, numberFormat);
       if (res) {
         buildData = res;
         selectedPath = null;
@@ -176,8 +203,27 @@
     }
   }
 
-  async function handleRebuild() {
-    await handleBuild();
+  async function handleRemoveBuild() {
+    if (!identifier) return;
+    removing = true;
+    try {
+      const ok = await removeBuild(identifier);
+      if (ok) {
+        buildData = null;
+        selectedPath = null;
+        originalContent = "";
+        draft = "";
+        collapsedDirs.clear();
+        search = "";
+        toast.success(m.build_remove_success());
+      } else {
+        toast.error(m.build_remove_failed());
+      }
+    } catch {
+      toast.error(m.build_remove_failed());
+    } finally {
+      removing = false;
+    }
   }
 
   async function handleSelectFile(path: string, isDir: boolean) {
@@ -277,15 +323,57 @@
     <Button size="sm" onclick={handleGoSplit}>{m.build_go_split()}</Button>
   </div>
 {:else if !hasBuild}
-  <div class="flex flex-1 flex-col items-center justify-center gap-6 p-6">
-    <div class="space-y-2 text-center">
-      <h3 class="text-sm font-semibold">{project?.title ?? ""}</h3>
-      <p class="text-xs text-muted-foreground">{m.build_no_build_hint()}</p>
+  <div class="flex flex-1 flex-col items-center justify-center overflow-auto p-6">
+    <div class="flex w-full max-w-xl flex-col gap-5">
+      <div class="space-y-1 text-center">
+        <h3 class="text-sm font-semibold">{project?.title ?? ""}</h3>
+        <p class="text-xs text-muted-foreground">{m.build_no_build_hint()}</p>
+      </div>
+
+      <div class="space-y-3 rounded-lg border p-4">
+        <div class="space-y-1.5">
+          <Label class="text-xs">{m.build_chapter_title_format_label()}</Label>
+          <Input
+            bind:value={chapterTitleFormat}
+            placeholder={m.build_chapter_title_format_placeholder({ order: "{order}", title: "{title}" })}
+            class="h-8 font-mono text-xs"
+          />
+        </div>
+        <div class="space-y-1.5">
+          <Label class="text-xs">{m.build_volume_title_format_label()}</Label>
+          <Input
+            bind:value={volumeTitleFormat}
+            placeholder={m.build_volume_title_format_placeholder({ order: "{order}", title: "{title}" })}
+            class="h-8 font-mono text-xs"
+          />
+        </div>
+        <div class="space-y-1.5">
+          <Label class="text-xs">{m.build_number_format_label()}</Label>
+          <Select
+            type="single"
+            value={numberFormat}
+            onValueChange={(v) => {
+              if (v) numberFormat = v as NumberFormat;
+            }}
+          >
+            <SelectTrigger class="h-8 text-xs">
+              {numberFormatLabel}
+            </SelectTrigger>
+            <SelectContent>
+              {#each numberFormatOptions as opt (opt.value)}
+                <SelectItem value={opt.value}>{opt.label()}</SelectItem>
+              {/each}
+            </SelectContent>
+          </Select>
+        </div>
+        <p class="text-xs text-muted-foreground">{m.build_title_format_hint({ order: "{order}", title: "{title}" })}</p>
+      </div>
+
+      <Button class="w-full gap-1.5" onclick={handleBuild} disabled={pending}>
+        <HammerIcon class="size-4" />
+        {pending ? m.build_building() : m.build_action()}
+      </Button>
     </div>
-    <Button class="gap-1.5" onclick={handleBuild} disabled={pending}>
-      <HammerIcon class="size-4" />
-      {pending ? m.build_building() : m.build_action()}
-    </Button>
   </div>
 {:else if buildData}
   <Resizable.PaneGroup direction="horizontal" class="h-full min-h-0 w-full flex-1">
@@ -300,12 +388,12 @@
           message={m.build_rebuild_confirm_message()}
           variant="destructive"
           confirmLabel={m.build_rebuild()}
-          onConfirm={handleRebuild}
+          onConfirm={handleRemoveBuild}
         >
           {#snippet trigger({ props })}
-            <Button variant="outline" size="sm" class="h-7 gap-1 text-xs" {...props} disabled={pending}>
+            <Button variant="outline" size="sm" class="h-7 gap-1 text-xs" {...props} disabled={removing || pending}>
               <RotateCcwIcon class="size-3.5" />
-              {pending ? m.build_rebuilding() : m.build_rebuild()}
+              {removing ? m.build_rebuilding() : m.build_rebuild()}
             </Button>
           {/snippet}
         </ConfirmDialog>

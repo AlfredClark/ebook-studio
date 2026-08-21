@@ -350,5 +350,17 @@
   "build_edit_hint": "编辑后点击保存，切换文件不保留未保存的修改",
   "build_binary_hint": "二进制文件无法预览",
   "build_no_files": "暂无文件",
+  "build_chapter_title_format_label": "章节标题格式",
+  "build_chapter_title_format_placeholder": "如： 第{order}章 {title}",
+  "build_volume_title_format_label": "卷标题格式",
+  "build_volume_title_format_placeholder": "如： 第{order}卷 {title}",
+  "build_number_format_label": "编号格式",
+  "build_number_format_arabic": "阿拉伯数字",
+  "build_number_format_padded": "补零阿拉伯",
+  "build_number_format_chinese_lower": "中文小写",
+  "build_number_format_chinese_upper": "中文大写",
+  "build_remove_success": "已删除构建产物",
+  "build_remove_failed": "删除失败",
+  "build_title_format_hint": "占位符 {order} 为编号，{title} 为标题，{title} 必填",
   "footer_copyright": "© {year} {author} 版权所有"
 }
